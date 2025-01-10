@@ -119,7 +119,7 @@ def generate_launch_description():
                 package="tf2_ros",
                 plugin="tf2_ros::StaticTransformBroadcasterNode",
                 name="static_tf2_broadcaster",
-                parameters=[{"child_frame_id": "/Arm_Base_Link", "frame_id": "/base_link"}],
+                parameters=[{"child_frame_id": "/base_link", "frame_id": "/world"}],
             ),
             ComposableNode(
                 package="moveit_servo",
