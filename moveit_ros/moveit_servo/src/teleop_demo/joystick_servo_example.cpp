@@ -58,8 +58,8 @@
 const std::string JOY_TOPIC = "/joy";
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
-const std::string EEF_FRAME_ID = "panda_hand";
-const std::string BASE_FRAME_ID = "panda_link0";
+const std::string EEF_FRAME_ID = "Grippy_Link";
+const std::string BASE_FRAME_ID = "Arm_Base_Link";
 
 // Enums for button names -> axis/button array index
 // For XBOX 1 controller
@@ -112,15 +112,15 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
   if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y])
   {
     // Map the D_PAD to the proximal joints
-    joint->joint_names.push_back("panda_joint1");
+    joint->joint_names.push_back("Joint_A");
     joint->velocities.push_back(axes[D_PAD_X]);
-    joint->joint_names.push_back("panda_joint2");
+    joint->joint_names.push_back("Joint_B");
     joint->velocities.push_back(axes[D_PAD_Y]);
 
     // Map the diamond to the distal joints
-    joint->joint_names.push_back("panda_joint7");
+    joint->joint_names.push_back("Joint_C");
     joint->velocities.push_back(buttons[B] - buttons[X]);
-    joint->joint_names.push_back("panda_joint6");
+    joint->joint_names.push_back("Joint_D");
     joint->velocities.push_back(buttons[Y] - buttons[A]);
     return false;
   }
@@ -183,7 +183,7 @@ public:
       rclcpp::sleep_for(std::chrono::seconds(3));
       // Create collision object, in the way of servoing
       moveit_msgs::msg::CollisionObject collision_object;
-      collision_object.header.frame_id = "panda_link0";
+      collision_object.header.frame_id = "Arm_Base_Link";
       collision_object.id = "box";
 
       shape_msgs::msg::SolidPrimitive table_1;
