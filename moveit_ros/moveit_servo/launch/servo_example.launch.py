@@ -1,6 +1,7 @@
 import os
 import yaml
 from launch import LaunchDescription
+from launch.actions import TimerAction
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import ComposableNodeContainer
@@ -87,7 +88,7 @@ def generate_launch_description():
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["arm_controller", "-c", "/controller_manager"],
+        arguments=["arm_controller", "-c", "/controller_manager",],
     )
 
     # Launch as much as possible in components
@@ -148,13 +149,22 @@ def generate_launch_description():
         output="screen",
     )
 
+    delayed_moveit_nodes = TimerAction(
+        period=3.0,  # Delay in seconds
+        actions=[
+           
+        ],
+    )
+
+
     return LaunchDescription(
         [
-            rviz_node,
+            delayed_moveit_nodes,
             ros2_control_node,
             joint_state_broadcaster_spawner,
-            arm_controller_spawner,
+            rviz_node,
             servo_node,
             container,
+            arm_controller_spawner,
         ]
     )
