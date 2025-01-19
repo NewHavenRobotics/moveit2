@@ -88,7 +88,7 @@ def generate_launch_description():
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["arm_controller", "-c", "/controller_manager",],
+        arguments=["arm_controller", "-c", "/controller_manager", "--inactive"],
     )
 
     # Launch as much as possible in components
@@ -150,21 +150,21 @@ def generate_launch_description():
     )
 
     delayed_moveit_nodes = TimerAction(
-        period=3.0,  # Delay in seconds
+        period=5.0,  # Delay in seconds
         actions=[
-           
+
         ],
     )
 
 
     return LaunchDescription(
         [
-            delayed_moveit_nodes,
-            ros2_control_node,
+            # delayed_moveit_nodes,
             joint_state_broadcaster_spawner,
             rviz_node,
             servo_node,
             container,
             arm_controller_spawner,
+            ros2_control_node,
         ]
     )
