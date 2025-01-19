@@ -88,7 +88,7 @@ def generate_launch_description():
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["arm_controller", "-c", "/controller_manager", "--inactive"],
+        arguments=["arm_controller", "-c", "/controller_manager",],
     )
 
     # Launch as much as possible in components
