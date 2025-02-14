@@ -58,6 +58,7 @@
 const std::string JOY0_TOPIC = "/joy";
 const std::string JOY1_TOPIC = "/transmitter/joy1";
 const std::string JOY2_TOPIC = "/transmitter/joy2";
+const std::string JOY3_TOPIC = "/transmitter/joy3";
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
 const std::string EEF_FRAME_ID = "gripper_link";
@@ -160,6 +161,15 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
     // double roll_negative = -1 * (buttons[LEFT_BUMPER]);
     // twist->twist.angular.z = roll_positive + roll_negative;
     twist->twist.angular.z = axes[2];
+  }else if(joyNum == 3){
+    joint->joint_names.push_back("joint_B");
+    joint->velocities.push_back(axes[0]);
+
+    joint->joint_names.push_back("joint_C");
+    joint->velocities.push_back(axes[1]);
+
+    joint->joint_names.push_back("joint_E"); // what is nussy even sayin?!?!?!?
+    joint->velocities.push_back(axes[2]);
   }
 
 
@@ -196,6 +206,9 @@ public:
     joy2_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
         JOY2_TOPIC, rclcpp::SystemDefaultsQoS(),
         [this](const sensor_msgs::msg::Joy::ConstSharedPtr& msg) { return joy2CB(msg); });
+    joy3_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+        JOY3_TOPIC, rclcpp::SystemDefaultsQoS(),
+        [this](const sensor_msgs::msg::Joy::ConstSharedPtr& msg) { return joy3CB(msg); });
 
     twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, rclcpp::SystemDefaultsQoS());
     joint_pub_ = this->create_publisher<control_msgs::msg::JointJog>(JOINT_TOPIC, rclcpp::SystemDefaultsQoS());
@@ -333,10 +346,37 @@ public:
     }
   }
 
+  void joy3CB(const sensor_msgs::msg::Joy::ConstSharedPtr& msg)
+  {
+    // Create the messages we might publish
+    auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
+    auto joint_msg = std::make_unique<control_msgs::msg::JointJog>();
+
+    // This call updates the frame for twist commands
+    updateCmdFrame(frame_to_publish_, msg->buttons);
+
+    // Convert the joystick message to Twist or JointJog and publish
+    if (convertJoyToCmd(3, msg->axes, msg->buttons, twist_msg, joint_msg))
+    {
+      // publish the TwistStamped
+      twist_msg->header.frame_id = frame_to_publish_;
+      twist_msg->header.stamp = this->now();
+      twist_pub_->publish(std::move(twist_msg));
+    }
+    else
+    {
+      // publish the JointJog
+      joint_msg->header.stamp = this->now();
+      joint_msg->header.frame_id = "panda_link3"; // dunno why this works with panda_link3 here but it do 
+      joint_pub_->publish(std::move(joint_msg));
+    }
+  }
+
 private:
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy0_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy1_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy2_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy3_sub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
   rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr joint_pub_;
   rclcpp::Publisher<moveit_msgs::msg::PlanningScene>::SharedPtr collision_pub_;
