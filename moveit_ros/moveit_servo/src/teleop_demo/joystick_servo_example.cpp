@@ -122,7 +122,7 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       // Map the diamond to the distal joints
       joint->joint_names.push_back("joint_C");
       joint->velocities.push_back(buttons[A] - buttons[X]);
-      joint->joint_names.push_back("joint_E");
+      joint->joint_names.push_back("joint_E"); // what is nussy even sayin?!?!?!?
       joint->velocities.push_back(buttons[B] - buttons[Y]);
       return false;
     }
