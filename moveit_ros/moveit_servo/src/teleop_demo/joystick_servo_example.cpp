@@ -55,12 +55,13 @@
 #include <thread>
 
 // We'll just set up parameters here
+const std::string JOY0_TOPIC = "/joy";
 const std::string JOY1_TOPIC = "/transmitter/joy1";
 const std::string JOY2_TOPIC = "/transmitter/joy2";
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
-const std::string EEF_FRAME_ID = "Grippy_Link";
-const std::string BASE_FRAME_ID = "Arm_Base_Link";
+const std::string EEF_FRAME_ID = "gripper_link";
+const std::string BASE_FRAME_ID = "arm_base_link";
 
 // Enums for button names -> axis/button array index
 // For XBOX 1 controller
@@ -110,23 +111,38 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
 {
   // Give joint jogging priority because it is only buttons
   // If any joint jog command is requested, we are only publishing joint commands
-  // if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y])
-  // {
-  //   // Map the D_PAD to the proximal joints
-  //   joint->joint_names.push_back("Joint_A");
-  //   joint->velocities.push_back(axes[D_PAD_X]);
-  //   joint->joint_names.push_back("Joint_B");
-  //   joint->velocities.push_back(axes[D_PAD_Y]);
+  if(joyNum == 0){
+    if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y]){
+      // Map the D_PAD to the proximal joints
+      joint->joint_names.push_back("joint_A");
+      joint->velocities.push_back(axes[D_PAD_X]);
+      joint->joint_names.push_back("joint_B");
+      joint->velocities.push_back(axes[D_PAD_Y]);
 
-  //   // Map the diamond to the distal joints
-  //   joint->joint_names.push_back("Joint_C");
-  //   joint->velocities.push_back(buttons[A] - buttons[X]);
-  //   joint->joint_names.push_back("Joint_D");
-  //   joint->velocities.push_back(buttons[B] - buttons[Y]);
-  //   return false;
-  // }
+      // Map the diamond to the distal joints
+      joint->joint_names.push_back("joint_C");
+      joint->velocities.push_back(buttons[A] - buttons[X]);
+      joint->joint_names.push_back("joint_E");
+      joint->velocities.push_back(buttons[B] - buttons[Y]);
+      return false;
+    }
+      // The bread and butter: map buttons to twist commands
+      twist->twist.linear.z = axes[RIGHT_STICK_Y];
+      twist->twist.linear.y = axes[RIGHT_STICK_X];
 
-  if(joyNum == 1){
+      double lin_x_right = -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
+      double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+      twist->twist.linear.x = lin_x_right + lin_x_left;
+
+      twist->twist.angular.y = axes[LEFT_STICK_Y];
+      twist->twist.angular.x = axes[LEFT_STICK_X];
+
+      double roll_positive = buttons[RIGHT_BUMPER];
+      double roll_negative = -1 * (buttons[LEFT_BUMPER]);
+      twist->twist.angular.z = roll_positive + roll_negative;
+
+      return true;
+  }else if(joyNum == 1){
     // The bread and butter: map buttons to twist commands
     twist->twist.linear.z = axes[2];
     twist->twist.linear.y = -axes[0];
@@ -171,6 +187,9 @@ public:
     : Node("joy_to_twist_publisher", options), frame_to_publish_(BASE_FRAME_ID)
   {
     // Setup pub/sub
+    joy0_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+      JOY0_TOPIC, rclcpp::SystemDefaultsQoS(),
+      [this](const sensor_msgs::msg::Joy::ConstSharedPtr& msg) { return joy0CB(msg); });
     joy1_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
         JOY1_TOPIC, rclcpp::SystemDefaultsQoS(),
         [this](const sensor_msgs::msg::Joy::ConstSharedPtr& msg) { return joy1CB(msg); });
@@ -236,6 +255,32 @@ public:
       collision_pub_thread_.join();
   }
 
+  void joy0CB(const sensor_msgs::msg::Joy::ConstSharedPtr& msg)
+  {
+    // Create the messages we might publish
+    auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
+    auto joint_msg = std::make_unique<control_msgs::msg::JointJog>();
+
+    // This call updates the frame for twist commands
+    updateCmdFrame(frame_to_publish_, msg->buttons);
+
+    // Convert the joystick message to Twist or JointJog and publish
+    if (convertJoyToCmd(0, msg->axes, msg->buttons, twist_msg, joint_msg))
+    {
+      // publish the TwistStamped
+      twist_msg->header.frame_id = frame_to_publish_;
+      twist_msg->header.stamp = this->now();
+      twist_pub_->publish(std::move(twist_msg));
+    }
+    else
+    {
+      // publish the JointJog
+      joint_msg->header.stamp = this->now();
+      joint_msg->header.frame_id = "panda_link3"; // dunno why this works with panda_link3 here but it do 
+      joint_pub_->publish(std::move(joint_msg));
+    }
+  }
+
   void joy1CB(const sensor_msgs::msg::Joy::ConstSharedPtr& msg)
   {
     // Create the messages we might publish
@@ -289,6 +334,7 @@ public:
   }
 
 private:
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy0_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy1_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy2_sub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;

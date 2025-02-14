@@ -64,7 +64,7 @@ struct ServoParameters
   // Properties of incoming commands
   std::string cartesian_command_in_topic{ "~/delta_twist_cmds" };
   std::string joint_command_in_topic{ "~/delta_joint_cmds" };
-  std::string robot_link_command_frame{ "Arm_Base_Link" };
+  std::string robot_link_command_frame{ "arm_base_link" };
   std::string command_in_type{ "unitless" };
   double linear_scale{ 0.4 };
   double rotational_scale{ 0.8 };
@@ -83,8 +83,8 @@ struct ServoParameters
   std::string smoothing_filter_plugin_name{ "online_signal_smoothing::ButterworthFilterPlugin" };
   // MoveIt properties
   std::string move_group_name{ "arm" };
-  std::string planning_frame{ "Arm_Base_Link" };
-  std::string ee_frame_name{ "Wrist3_Link" };
+  std::string planning_frame{ "arm_base_link" };
+  std::string ee_frame_name{ "wrist3_link" };
   bool is_primary_planning_scene_monitor = { true };
   std::string monitored_planning_scene_topic{
     planning_scene_monitor::PlanningSceneMonitor::DEFAULT_PLANNING_SCENE_TOPIC
@@ -95,8 +95,8 @@ struct ServoParameters
   bool halt_all_joints_in_joint_mode{ true };
   bool halt_all_joints_in_cartesian_mode{ true };
   // Configure handling of singularities and joint limits
-  double lower_singularity_threshold{ 17.0 };
-  double hard_stop_singularity_threshold{ 30.0 };
+  double lower_singularity_threshold{ 1.0 };
+  double hard_stop_singularity_threshold{ 300.0 };
   double leaving_singularity_threshold_multiplier{ 2.0 };
   double joint_limit_margin{ 0.1 };
   bool low_latency_mode{ false };
