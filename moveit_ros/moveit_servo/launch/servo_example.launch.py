@@ -82,13 +82,24 @@ def generate_launch_description():
             "300",
             "--controller-manager",
             "/controller_manager",
-        ],
+            ],
     )
 
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["arm_controller", "-c", "/controller_manager",],
+    )
+    
+    velocity_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "velocity_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--inactive",
+        ],
     )
 
     # Launch as much as possible in components
@@ -155,10 +166,11 @@ def generate_launch_description():
         [
             # delayed_moveit_nodes,
             joint_state_broadcaster_spawner,
-            rviz_node,
+            # rviz_node,
             servo_node,
             container,
             arm_controller_spawner,
             ros2_control_node,
+            velocity_controller_spawner,
         ]
     )
