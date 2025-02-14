@@ -171,6 +171,6 @@ def generate_launch_description():
             container,
             arm_controller_spawner,
             ros2_control_node,
-            velocity_controller_spawner,
+            # velocity_controller_spawner,
         ]
     )
