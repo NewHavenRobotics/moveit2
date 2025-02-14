@@ -289,7 +289,7 @@ public:
     {
       // publish the JointJog
       joint_msg->header.stamp = this->now();
-      joint_msg->header.frame_id = "panda_link3"; // dunno why this works with panda_link3 here but it do 
+      joint_msg->header.frame_id = "shoulder2_link"; 
       joint_pub_->publish(std::move(joint_msg));
     }
   }
@@ -315,7 +315,7 @@ public:
     {
       // publish the JointJog
       joint_msg->header.stamp = this->now();
-      joint_msg->header.frame_id = "panda_link3"; // dunno why this works with panda_link3 here but it do 
+      joint_msg->header.frame_id = "shoulder2_link"; 
       joint_pub_->publish(std::move(joint_msg));
     }
   }
@@ -341,7 +341,7 @@ public:
     {
       // publish the JointJog
       joint_msg->header.stamp = this->now();
-      joint_msg->header.frame_id = "panda_link3"; // dunno why this works with panda_link3 here but it do 
+      joint_msg->header.frame_id = "shoulder2_link"; 
       joint_pub_->publish(std::move(joint_msg));
     }
   }
@@ -367,7 +367,7 @@ public:
     {
       // publish the JointJog
       joint_msg->header.stamp = this->now();
-      joint_msg->header.frame_id = "panda_link3"; // dunno why this works with panda_link3 here but it do 
+      joint_msg->header.frame_id = "shoulder2_link";
       joint_pub_->publish(std::move(joint_msg));
     }
   }
