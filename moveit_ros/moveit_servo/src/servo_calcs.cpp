@@ -749,7 +749,9 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
   for (std::size_t i = 0; i < joint_state.position.size(); ++i)
   {
     // Increment joint
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
     joint_state.position[i] += delta_theta[i];
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
   }
 
   smoother_->doSmoothing(joint_state.position);
@@ -759,6 +761,10 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
     // Calculate joint velocity
     joint_state.velocity[i] =
         (joint_state.position.at(i) - original_joint_state_.position.at(i)) / parameters_->publish_period;
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " velocity: " << joint_state.velocity[i]); // debug
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position: " << joint_state.position.at(i)); // debug
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " original position: " << original_joint_state_.position.at(i)); // debug
+    // RCLCPP_INFO_STREAM(LOGGER, "publish period: " << parameters_->publish_period;); // debug
   }
 
   return true;
