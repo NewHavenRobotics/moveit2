@@ -790,7 +790,9 @@ void ServoCalcs::insertRedundantPointsIntoTrajectory(trajectory_msgs::msg::Joint
 
 void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_state)
 {
+  RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position); // debug
   smoother_->reset(joint_state.position);
+  RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position); // debug
   updated_filters_ = true;
 }
 
