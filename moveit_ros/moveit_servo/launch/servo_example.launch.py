@@ -1,7 +1,8 @@
 import os
 import yaml
 from launch import LaunchDescription
-from launch.actions import TimerAction
+from launch.actions import TimerAction, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import ComposableNodeContainer
@@ -34,6 +35,20 @@ def load_yaml(package_name, file_path):
 
 
 def generate_launch_description():
+    
+    declared_arguments=[]
+    
+    declared_arguments.append(
+       DeclareLaunchArgument(
+           "use_mock_hardware",
+           default_value="false",
+           description="Start robot with mock hardware mirroring command to its states.",
+       )
+   )
+    
+    # Initialize Arguments
+    use_mock_hardware = LaunchConfiguration("use_mock_hardware")
+        
     moveit_config = (
         MoveItConfigsBuilder("arm")
         .robot_description(file_path="config/arm.urdf.xacro")
@@ -160,17 +175,17 @@ def generate_launch_description():
 
         ],
     )
+    
+    nodes=[
+        # delayed_moveit_nodes,
+        joint_state_broadcaster_spawner,
+        rviz_node,
+        servo_node,
+        container,
+        arm_controller_spawner,
+        ros2_control_node,
+        # velocity_controller_spawner,
+    ]
 
 
-    return LaunchDescription(
-        [
-            # delayed_moveit_nodes,
-            joint_state_broadcaster_spawner,
-            # rviz_node,
-            servo_node,
-            container,
-            arm_controller_spawner,
-            ros2_control_node,
-            # velocity_controller_spawner,
-        ]
-    )
+    return LaunchDescription(declared_arguments + nodes)
