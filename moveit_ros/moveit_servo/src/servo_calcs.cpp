@@ -648,6 +648,7 @@ bool ServoCalcs::cartesianServoCalcs(geometry_msgs::msg::TwistStamped& cmd,
                                                       parameters_->leaving_singularity_threshold_multiplier,
                                                       *node_->get_clock(), current_state_, status_);
 
+  RCLCPP_INFO_STREAM(LOGGER, "called from catesian calcs"); // debug
   return internalServoUpdate(delta_theta_, joint_trajectory, ServoType::CARTESIAN_SPACE);
 }
 
@@ -662,6 +663,7 @@ bool ServoCalcs::jointServoCalcs(const control_msgs::msg::JointJog& cmd,
   delta_theta_ = scaleJointCommand(cmd);
 
   // Perform internal servo with the command
+  RCLCPP_INFO_STREAM(LOGGER, "called from joint calcs"); // debug
   return internalServoUpdate(delta_theta_, joint_trajectory, ServoType::JOINT_SPACE);
 }
 
@@ -678,6 +680,7 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
 
   // Set internal joint state from original
   internal_joint_state_ = original_joint_state_;
+  RCLCPP_INFO_STREAM(LOGGER, "internal joint state: " << internal_joint_state_.position[2]); // debug
 
   // Apply collision scaling
   double collision_scale = collision_velocity_scale_;
@@ -696,12 +699,16 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
   delta_theta *= collision_scale;
 
   // Loop thru joints and update them, calculate velocities, and filter
+  // RCLCPP_INFO_STREAM(LOGGER, "delta theta: " << delta_theta[2]); // debug
+  RCLCPP_INFO_STREAM(LOGGER, "joint position before update: " << internal_joint_state_.position[2]); // debug
   if (!applyJointUpdate(delta_theta, internal_joint_state_))
     return false;
-
+  
+  RCLCPP_INFO_STREAM(LOGGER, "joint position after update: " << internal_joint_state_.position[2]); // debug
   // Mark the lowpass filters as updated for this cycle
   updated_filters_ = true;
 
+  // RCLCPP_INFO_STREAM(LOGGER, "joint position before SRDF enforcement: " << internal_joint_state_.position[2]); // debug
   // Enforce SRDF velocity limits
   enforceVelocityLimits(joint_model_group_, parameters_->publish_period, internal_joint_state_,
                         parameters_->override_velocity_scaling_factor);
@@ -721,6 +728,7 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
       suddenHalt(internal_joint_state_, joint_model_group_->getActiveJointModels());
     }
   }
+  // RCLCPP_INFO_STREAM(LOGGER, "joint position after SRDF enforcement: " << internal_joint_state_.position[2]); // debug
 
   // compose outgoing message
   composeJointTrajMessage(internal_joint_state_, joint_trajectory);
@@ -728,9 +736,10 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
   // Modify the output message if we are using gazebo
   if (parameters_->use_gazebo)
   {
+    RCLCPP_INFO_STREAM(LOGGER, "were using gazebo????"); // debug
     insertRedundantPointsIntoTrajectory(joint_trajectory, gazebo_redundant_message_count_);
   }
-
+  RCLCPP_INFO_STREAM(LOGGER, "joint position at end: " << internal_joint_state_.position[2]); // debug
   return true;
 }
 
@@ -790,9 +799,7 @@ void ServoCalcs::insertRedundantPointsIntoTrajectory(trajectory_msgs::msg::Joint
 
 void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_state)
 {
-  RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position); // debug
   smoother_->reset(joint_state.position);
-  RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position); // debug
   updated_filters_ = true;
 }
 
