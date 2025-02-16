@@ -758,9 +758,9 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
   for (std::size_t i = 0; i < joint_state.position.size(); ++i)
   {
     // Increment joint
-    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
+    RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
     joint_state.position[i] += delta_theta[i];
-    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
+    RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
   }
 
   smoother_->doSmoothing(joint_state.position);
@@ -770,13 +770,24 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
     // Calculate joint velocity
     joint_state.velocity[i] =
         (joint_state.position.at(i) - original_joint_state_.position.at(i)) / parameters_->publish_period;
-    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " velocity: " << joint_state.velocity[i]); // debug
-    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position: " << joint_state.position.at(i)); // debug
-    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " original position: " << original_joint_state_.position.at(i)); // debug
-    // RCLCPP_INFO_STREAM(LOGGER, "publish period: " << parameters_->publish_period;); // debug
+    RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " velocity: " << joint_state.velocity[i]); // debug
   }
 
   return true;
+}
+
+void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_state)
+{
+  for (std::size_t i = 0; i < joint_state.position.size(); ++i)
+  {
+    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
+  }
+  smoother_->reset(joint_state.position);
+  for (std::size_t i = 0; i < joint_state.position.size(); ++i)
+  {
+    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
+  }
+  updated_filters_ = true;
 }
 
 // Spam several redundant points into the trajectory. The first few may be skipped if the
@@ -799,7 +810,15 @@ void ServoCalcs::insertRedundantPointsIntoTrajectory(trajectory_msgs::msg::Joint
 
 void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_state)
 {
+  for (std::size_t i = 0; i < joint_state.position.size(); ++i)
+  {
+    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
+  }
   smoother_->reset(joint_state.position);
+  for (std::size_t i = 0; i < joint_state.position.size(); ++i)
+  {
+    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
+  }
   updated_filters_ = true;
 }
 
