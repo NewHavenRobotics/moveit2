@@ -648,7 +648,7 @@ bool ServoCalcs::cartesianServoCalcs(geometry_msgs::msg::TwistStamped& cmd,
                                                       parameters_->leaving_singularity_threshold_multiplier,
                                                       *node_->get_clock(), current_state_, status_);
 
-  RCLCPP_INFO_STREAM(LOGGER, "called from catesian calcs"); // debug
+  RCLCPP_DEBUG_STREAM(LOGGER, "called from catesian calcs"); // debug
   return internalServoUpdate(delta_theta_, joint_trajectory, ServoType::CARTESIAN_SPACE);
 }
 
@@ -663,7 +663,7 @@ bool ServoCalcs::jointServoCalcs(const control_msgs::msg::JointJog& cmd,
   delta_theta_ = scaleJointCommand(cmd);
 
   // Perform internal servo with the command
-  RCLCPP_INFO_STREAM(LOGGER, "called from joint calcs"); // debug
+  RCLCPP_DEBUG_STREAM(LOGGER, "called from joint calcs"); // debug
   return internalServoUpdate(delta_theta_, joint_trajectory, ServoType::JOINT_SPACE);
 }
 
@@ -680,7 +680,7 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
 
   // Set internal joint state from original
   internal_joint_state_ = original_joint_state_;
-  RCLCPP_INFO_STREAM(LOGGER, "internal joint state: " << internal_joint_state_.position[2]); // debug
+  // RCLCPP_INFO_STREAM(LOGGER, "internal joint state: " << internal_joint_state_.position[2]); // debug
 
   // Apply collision scaling
   double collision_scale = collision_velocity_scale_;
@@ -700,11 +700,11 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
 
   // Loop thru joints and update them, calculate velocities, and filter
   // RCLCPP_INFO_STREAM(LOGGER, "delta theta: " << delta_theta[2]); // debug
-  RCLCPP_INFO_STREAM(LOGGER, "joint position before update: " << internal_joint_state_.position[2]); // debug
+  // RCLCPP_INFO_STREAM(LOGGER, "joint position before update: " << internal_joint_state_.position[2]); // debug
   if (!applyJointUpdate(delta_theta, internal_joint_state_))
     return false;
   
-  RCLCPP_INFO_STREAM(LOGGER, "joint position after update: " << internal_joint_state_.position[2]); // debug
+  // RCLCPP_INFO_STREAM(LOGGER, "joint position after update: " << internal_joint_state_.position[2]); // debug
   // Mark the lowpass filters as updated for this cycle
   updated_filters_ = true;
 
@@ -736,10 +736,10 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
   // Modify the output message if we are using gazebo
   if (parameters_->use_gazebo)
   {
-    RCLCPP_INFO_STREAM(LOGGER, "were using gazebo????"); // debug
+    // RCLCPP_INFO_STREAM(LOGGER, "were using gazebo????"); // debug
     insertRedundantPointsIntoTrajectory(joint_trajectory, gazebo_redundant_message_count_);
   }
-  RCLCPP_INFO_STREAM(LOGGER, "joint position at end: " << internal_joint_state_.position[2]); // debug
+  // RCLCPP_INFO_STREAM(LOGGER, "joint position at end: " << internal_joint_state_.position[2]); // debug
   return true;
 }
 
@@ -758,9 +758,9 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
   for (std::size_t i = 0; i < joint_state.position.size(); ++i)
   {
     // Increment joint
-    RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
+    // RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
     joint_state.position[i] += delta_theta[i];
-    RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
+    // RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
   }
 
   smoother_->doSmoothing(joint_state.position);
@@ -770,7 +770,7 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
     // Calculate joint velocity
     joint_state.velocity[i] =
         (joint_state.position.at(i) - original_joint_state_.position.at(i)) / parameters_->publish_period;
-    RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " velocity: " << joint_state.velocity[i]); // debug
+    // RCLCPP_DEBUG_STREAM(LOGGER, "joint " << i << " velocity: " << joint_state.velocity[i]); // debug
   }
 
   return true;
@@ -780,12 +780,12 @@ void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_s
 {
   for (std::size_t i = 0; i < joint_state.position.size(); ++i)
   {
-    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
   }
   smoother_->reset(joint_state.position);
   for (std::size_t i = 0; i < joint_state.position.size(); ++i)
   {
-    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
+    // RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
   }
   updated_filters_ = true;
 }
@@ -808,20 +808,6 @@ void ServoCalcs::insertRedundantPointsIntoTrajectory(trajectory_msgs::msg::Joint
   }
 }
 
-void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_state)
-{
-  for (std::size_t i = 0; i < joint_state.position.size(); ++i)
-  {
-    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position before: " << joint_state.position[i]); // debug
-  }
-  smoother_->reset(joint_state.position);
-  for (std::size_t i = 0; i < joint_state.position.size(); ++i)
-  {
-    RCLCPP_INFO_STREAM(LOGGER, "joint " << i << " position after: " << joint_state.position[i]); // debug
-  }
-  updated_filters_ = true;
-}
-
 void ServoCalcs::composeJointTrajMessage(const sensor_msgs::msg::JointState& joint_state,
                                          trajectory_msgs::msg::JointTrajectory& joint_trajectory)
 {
@@ -833,10 +819,14 @@ void ServoCalcs::composeJointTrajMessage(const sensor_msgs::msg::JointState& joi
 
   trajectory_msgs::msg::JointTrajectoryPoint point;
   point.time_from_start = rclcpp::Duration::from_seconds(parameters_->publish_period);
-  if (parameters_->publish_joint_positions)
+  if (parameters_->publish_joint_positions){
     point.positions = joint_state.position;
-  if (parameters_->publish_joint_velocities)
+    RCLCPP_INFO_STREAM(LOGGER, "PUBLISHING POS " << joint_state.position[2]);
+    }
+  if (parameters_->publish_joint_velocities){
     point.velocities = joint_state.velocity;
+    RCLCPP_INFO_STREAM(LOGGER, "PUBLISHING VEL " << joint_state.velocity[2]);
+    }
   if (parameters_->publish_joint_accelerations)
   {
     // I do not know of a robot that takes acceleration commands.
@@ -851,12 +841,13 @@ void ServoCalcs::composeJointTrajMessage(const sensor_msgs::msg::JointState& joi
 std::vector<const moveit::core::JointModel*>
 ServoCalcs::enforcePositionLimits(sensor_msgs::msg::JointState& joint_state) const
 {
+  // RCLCPP_INFO_STREAM(LOGGER, "inside enforce position limits"); // debug
   // Halt if we're past a joint margin and joint velocity is moving even farther past
   double joint_angle = 0;
   std::vector<const moveit::core::JointModel*> joints_to_halt;
   for (auto joint : joint_model_group_->getActiveJointModels())
   {
-    for (std::size_t c = 0; c < joint_state.name.size(); ++c)
+    for (std::size_t c = 0; c < joint_state.name.size(); ++c) // why is this iterator c????
     {
       // Use the most recent robot joint state
       if (joint_state.name[c] == joint->getName())
@@ -865,11 +856,11 @@ ServoCalcs::enforcePositionLimits(sensor_msgs::msg::JointState& joint_state) con
         break;
       }
     }
-
+    // RCLCPP_INFO_STREAM(LOGGER, "ABOUT TO SATIASFY POS BFUJIQWELRBHFNIUERWKBR"); // debug
     if (!joint->satisfiesPositionBounds(&joint_angle, -parameters_->joint_limit_margin))
     {
       const std::vector<moveit_msgs::msg::JointLimits>& limits = joint->getVariableBoundsMsg();
-
+      
       // Joint limits are not defined for some joints. Skip them.
       if (!limits.empty())
       {
@@ -1058,6 +1049,8 @@ Eigen::VectorXd ServoCalcs::scaleCartesianCommand(const geometry_msgs::msg::Twis
 
 Eigen::VectorXd ServoCalcs::scaleJointCommand(const control_msgs::msg::JointJog& command)
 {
+  RCLCPP_DEBUG_STREAM(LOGGER, "scaleJointCommand called"); // debug
+
   Eigen::VectorXd result(num_joints_);
   result.setZero();
 
@@ -1076,10 +1069,16 @@ Eigen::VectorXd ServoCalcs::scaleJointCommand(const control_msgs::msg::JointJog&
     }
     // Apply user-defined scaling if inputs are unitless [-1:1]
     if (parameters_->command_in_type == "unitless")
+    {
       result[c] = command.velocities[m] * parameters_->joint_scale * parameters_->publish_period;
+      RCLCPP_DEBUG_STREAM(LOGGER, "Joint " << command.joint_names[m] << " scaled velocity (unitless): " << result[c]);
+    }
     // Otherwise, commands are in m/s and rad/s
     else if (parameters_->command_in_type == "speed_units")
+    {
       result[c] = command.velocities[m] * parameters_->publish_period;
+      RCLCPP_DEBUG_STREAM(LOGGER, "Joint " << command.joint_names[m] << " scaled velocity (speed units): " << result[c]);
+    }
     else
     {
       rclcpp::Clock& clock = *node_->get_clock();

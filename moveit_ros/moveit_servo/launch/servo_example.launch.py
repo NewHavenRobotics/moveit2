@@ -167,6 +167,8 @@ def generate_launch_description():
             moveit_config.robot_description_kinematics,
         ],
         output="screen",
+        # Add log level
+        # arguments=["--ros-args", "--log-level", "debug"]
     )
 
     delayed_moveit_nodes = TimerAction(
@@ -179,7 +181,7 @@ def generate_launch_description():
     nodes=[
         # delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
-        rviz_node,
+        # rviz_node,
         servo_node,
         container,
         arm_controller_spawner,
