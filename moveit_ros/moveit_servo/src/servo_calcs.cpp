@@ -821,11 +821,11 @@ void ServoCalcs::composeJointTrajMessage(const sensor_msgs::msg::JointState& joi
   point.time_from_start = rclcpp::Duration::from_seconds(parameters_->publish_period);
   if (parameters_->publish_joint_positions){
     point.positions = joint_state.position;
-    RCLCPP_INFO_STREAM(LOGGER, "PUBLISHING POS " << joint_state.position[2]);
+    // RCLCPP_INFO_STREAM(LOGGER, "PUBLISHING POS " << joint_state.position[0]);
     }
   if (parameters_->publish_joint_velocities){
     point.velocities = joint_state.velocity;
-    RCLCPP_INFO_STREAM(LOGGER, "PUBLISHING VEL " << joint_state.velocity[2]);
+    // RCLCPP_INFO_STREAM(LOGGER, "PUBLISHING VEL " << joint_state.velocity[2]);
     }
   if (parameters_->publish_joint_accelerations)
   {

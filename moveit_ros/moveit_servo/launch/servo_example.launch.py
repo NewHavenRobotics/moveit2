@@ -35,19 +35,6 @@ def load_yaml(package_name, file_path):
 
 
 def generate_launch_description():
-    
-    declared_arguments=[]
-    
-    declared_arguments.append(
-       DeclareLaunchArgument(
-           "use_mock_hardware",
-           default_value="false",
-           description="Start robot with mock hardware mirroring command to its states.",
-       )
-   )
-    
-    # Initialize Arguments
-    use_mock_hardware = LaunchConfiguration("use_mock_hardware")
         
     moveit_config = (
         MoveItConfigsBuilder("arm")
@@ -96,8 +83,7 @@ def generate_launch_description():
             "--controller-manager-timeout",
             "300",
             "--controller-manager",
-            "/controller_manager",
-            ],
+            "/controller_manager",],
     )
 
     arm_controller_spawner = Node(
@@ -181,7 +167,7 @@ def generate_launch_description():
     nodes=[
         # delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
-        # rviz_node,
+        rviz_node,
         servo_node,
         container,
         arm_controller_spawner,
@@ -190,4 +176,4 @@ def generate_launch_description():
     ]
 
 
-    return LaunchDescription(declared_arguments + nodes)
+    return LaunchDescription(nodes)
