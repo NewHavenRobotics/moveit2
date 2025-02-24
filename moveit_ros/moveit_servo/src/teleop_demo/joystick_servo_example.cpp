@@ -53,6 +53,7 @@
 #include <rclcpp/time.hpp>
 #include <rclcpp/utilities.hpp>
 #include <thread>
+#include <iostream> // Add this include for debug output
 
 // We'll just set up parameters here
 const std::string JOY0_TOPIC = "/joy";
@@ -145,12 +146,13 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       return true;
   }else if(joyNum == 1){
     // The bread and butter: map buttons to twist commands
-    twist->twist.linear.z = axes[2];
-    twist->twist.linear.y = -axes[0];
+    twist->twist.linear.z = axes[0];
+    twist->twist.linear.y = -axes[2];
 
     // double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
     // double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
     twist->twist.linear.x = axes[1];
+    return true;
   }else if(joyNum == 2){
     // twist->twist.angular.y = axes[LEFT_STICK_Y];
     twist->twist.angular.y = axes[0];
@@ -161,15 +163,28 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
     // double roll_negative = -1 * (buttons[LEFT_BUMPER]);
     // twist->twist.angular.z = roll_positive + roll_negative;
     twist->twist.angular.z = axes[2];
+    return true;
   }else if(joyNum == 3){
-    joint->joint_names.push_back("joint_B");
-    joint->velocities.push_back(axes[0]);
+    if(!buttons[0]){
+      joint->joint_names.push_back("joint_A");
+      joint->velocities.push_back(-axes[2]);
 
-    joint->joint_names.push_back("joint_C");
-    joint->velocities.push_back(axes[1]);
+      joint->joint_names.push_back("joint_B");
+      joint->velocities.push_back(-axes[1]);
 
-    joint->joint_names.push_back("joint_E"); // what is nussy even sayin?!?!?!?
-    joint->velocities.push_back(axes[2]);
+      joint->joint_names.push_back("joint_C"); // what is nussy even sayin?!?!?!?
+      joint->velocities.push_back(-axes[0]);
+    }else{
+      joint->joint_names.push_back("joint_D");
+      joint->velocities.push_back(axes[1]);
+
+      joint->joint_names.push_back("joint_E");
+      joint->velocities.push_back(-axes[0]);
+
+      joint->joint_names.push_back("joint_F"); // what is nussy even sayin?!?!?!?
+      joint->velocities.push_back(axes[2]);
+    }
+    return false;
   }
 
 

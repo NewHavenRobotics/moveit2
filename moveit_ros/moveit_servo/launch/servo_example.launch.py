@@ -167,7 +167,7 @@ def generate_launch_description():
     nodes=[
         # delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
-        rviz_node,
+        # rviz_node,
         servo_node,
         container,
         arm_controller_spawner,
