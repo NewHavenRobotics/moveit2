@@ -11,12 +11,12 @@
 #include <moveit_msgs/msg/planning_scene.h>
 #include <moveit_visual_tools/moveit_visual_tools.h>
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <sensor_msgs/msg/joint_state.hpp>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("keyboard_autonomy");
 
 int main(int argc, char ** argv)
 {
-  // spin node in seperate thread
   rclcpp::init(argc, argv);
   rclcpp::NodeOptions node_options;
   node_options.automatically_declare_parameters_from_overrides(true);
@@ -31,9 +31,37 @@ int main(int argc, char ** argv)
   moveit::core::RobotStatePtr robot_state(new moveit::core::RobotState(robot_model));
   const moveit::core::JointModelGroup* joint_model_group = robot_state->getJointModelGroup(PLANNING_GROUP);
 
+  if (!joint_model_group)
+  {
+      RCLCPP_ERROR(LOGGER, "JointModelGroup for planning group '%s' is null. Check your MoveIt configuration.", PLANNING_GROUP.c_str());
+      return 1;
+  }
+
   // use robot model to instantiate the planning scene
   planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model));
   planning_scene->getCurrentStateNonConst().setToDefaultValues(joint_model_group, "folded");
+
+  if (!planning_scene)
+  {
+      RCLCPP_ERROR(LOGGER, "Planning scene is null");
+      return 1;
+  }
+
+  // Update the robot state with the latest joint states
+  planning_scene->getCurrentStateNonConst().update();
+
+  // Debugging: Check if the JointState is populated
+  std::vector<double> joint_values;
+  robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+
+  if (joint_values.empty())
+  {
+      RCLCPP_ERROR(LOGGER, "JointState is empty. Ensure the robot state is properly initialized.");
+  }
+  else
+  {
+      RCLCPP_INFO(LOGGER, "JointState received: %zu joints", joint_values.size());
+  }
 
   // load a planning plugin
   std::unique_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager>> planner_plugin_loader;
@@ -52,8 +80,7 @@ int main(int argc, char ** argv)
   try
   {
     planner_instance.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
-    if (!planner_instance->initialize(robot_model, keyboard_autonomy_node,
-                                      keyboard_autonomy_node->get_namespace()))
+    if (!planner_instance->initialize(robot_model, keyboard_autonomy_node, keyboard_autonomy_node->get_namespace()))
       RCLCPP_FATAL(LOGGER, "Could not initialize planner instance");
     RCLCPP_INFO(LOGGER, "Using planning interface '%s'", planner_instance->getDescription().c_str());
   }
@@ -67,21 +94,16 @@ int main(int argc, char ** argv)
                 ex.what(), ss.str().c_str());
   }
 
+  RCLCPP_INFO(LOGGER, "Using planner plugin: %s", planner_plugin_name.c_str());
+
   moveit::planning_interface::MoveGroupInterface move_group(keyboard_autonomy_node, PLANNING_GROUP);
 
   // Ensure the start state is set to the current state
   move_group.setStartStateToCurrentState();
 
-  // Debugging: Check if the JointState is populated
-  std::vector<double> joint_values;
-  robot_state->copyJointGroupPositions(joint_model_group, joint_values);
-
-  if (joint_values.empty())
-  {
-      RCLCPP_ERROR(LOGGER, "JointState is empty. Ensure the robot state is properly initialized.");
-  }
-
   // Define a goal pose
+  planning_interface::MotionPlanRequest req;
+  planning_interface::MotionPlanResponse res;
   geometry_msgs::msg::PoseStamped pose;
   pose.header.frame_id = "arm_base_link";
   pose.pose.position.x = 0.3;
@@ -89,27 +111,46 @@ int main(int argc, char ** argv)
   pose.pose.position.z = 0.75;
   pose.pose.orientation.w = 1.0;
 
+  RCLCPP_INFO(LOGGER, "Pose set to: x: %f, y: %f, z: %f", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z); // debug
+
   // A tolerance of 0.01 m is specified in position
   // and 0.01 radians in orientation
   std::vector<double> tolerance_pose(3, 0.01);
   std::vector<double> tolerance_angle(3, 0.01);
 
+  RCLCPP_INFO(LOGGER, "Tolerance set to: %f", tolerance_pose[0]); // debug
+
   // Construct goal constraints
   moveit_msgs::msg::Constraints pose_goal =
       kinematic_constraints::constructGoalConstraints("wrist3_link", pose, tolerance_pose, tolerance_angle);
 
-  planning_interface::MotionPlanRequest req;
-  planning_interface::MotionPlanResponse res;
-
+  RCLCPP_INFO(LOGGER, "Setting up motion plan request"); // debug
   req.group_name = PLANNING_GROUP;
   req.goal_constraints.push_back(pose_goal);
+
+  RCLCPP_INFO(LOGGER, "Planning group: %s", req.group_name.c_str());
+  RCLCPP_INFO(LOGGER, "Number of goal constraints: %zu", req.goal_constraints.size());
 
   // We now construct a planning context that encapsulate the scene,
   // the request and the response. We call the planner using this
   // planning context
+  RCLCPP_INFO(LOGGER, "Constructing planning context"); // debug
   planning_interface::PlanningContextPtr context =
       planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
+
+  if (!context)
+  {
+      RCLCPP_ERROR(LOGGER, "Failed to create planning context");
+      return 1;
+  }
+  if (res.error_code_.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS)
+  {
+      RCLCPP_ERROR(LOGGER, "Error code: %d", res.error_code_.val);
+      return 1;
+  }
+
   context->solve(res);
+  
   if (res.error_code_.val != res.error_code_.SUCCESS)
   {
     RCLCPP_ERROR(LOGGER, "Could not compute plan successfully");
