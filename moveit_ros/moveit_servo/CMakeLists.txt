@@ -53,6 +53,8 @@ find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(graph_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
+find_package(moveit_visual_tools REQUIRED)
+find_package(rviz_visual_tools REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
@@ -146,6 +148,10 @@ ament_target_dependencies(${KEYBOARD_AUTONOMY_NODE_NAME}
   tf2_eigen
   trajectory_msgs
   graph_msgs
+)
+target_link_libraries(${KEYBOARD_AUTONOMY_NODE_NAME}
+  moveit_visual_tools::moveit_visual_tools
+  rviz_visual_tools::rviz_visual_tools
 )
 
 #############
