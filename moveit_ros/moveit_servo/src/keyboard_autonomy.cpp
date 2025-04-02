@@ -43,7 +43,6 @@
 #include <moveit/kinematic_constraints/utils.h>
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <moveit_msgs/msg/planning_scene.h>
-#include <moveit_visual_tools/moveit_visual_tools.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("Keyboard_Autonomy");
@@ -130,37 +129,10 @@ int main(int argc, char** argv)
 
   moveit::planning_interface::MoveGroupInterface move_group(keyboard_autonomy_node, PLANNING_GROUP);
 
-  // Visualization
-  // ^^^^^^^^^^^^^
-  // The package MoveItVisualTools provides many capabilities for visualizing objects, robots,
-  // and trajectories in RViz as well as debugging tools such as step-by-step introspection of a script.
-  namespace rvt = rviz_visual_tools;
-  moveit_visual_tools::MoveItVisualTools visual_tools(keyboard_autonomy_node, "arm_base_link",
-                                                      "move_group_tutorial", move_group.getRobotModel());
-  visual_tools.enableBatchPublishing();
-  visual_tools.deleteAllMarkers();  // clear all old markers
-  visual_tools.trigger();
-
-  /* Remote control is an introspection tool that allows users to step through a high level script
-     via buttons and keyboard shortcuts in RViz */
-  visual_tools.loadRemoteControl();
-
-  /* RViz provides many types of markers, in this demo we will use text, cylinders, and spheres*/
-  Eigen::Isometry3d text_pose = Eigen::Isometry3d::Identity();
-  text_pose.translation().z() = 1.75;
-  visual_tools.publishText(text_pose, "Motion Planning API Demo", rvt::WHITE, rvt::XLARGE);
-
-  /* Batch publishing is used to reduce the number of messages being sent to RViz for large visualizations */
-  visual_tools.trigger();
-
-  /* We can also use visual_tools to wait for user input */
-  visual_tools.prompt("Press 'next' in the RvizVisualToolsGui window to start the demo");
-
   // Pose Goal
   // ^^^^^^^^^
   // We will now create a motion plan request for the arm of the Panda
   // specifying the desired pose of the end-effector as input.
-  visual_tools.trigger();
   planning_interface::MotionPlanRequest req;
   planning_interface::MotionPlanResponse res;
   geometry_msgs::msg::PoseStamped pose;
@@ -210,21 +182,11 @@ int main(int argc, char** argv)
 
   display_trajectory.trajectory_start = response.trajectory_start;
   display_trajectory.trajectory.push_back(response.trajectory);
-  visual_tools.publishTrajectoryLine(display_trajectory.trajectory.back(), joint_model_group);
-  visual_tools.trigger();
   display_publisher->publish(display_trajectory);
 
   /* Set the state in the planning scene to the final state of the last plan */
   robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
   planning_scene->setCurrentState(*robot_state.get());
-
-  // Display the goal state
-  visual_tools.publishAxisLabeled(pose.pose, "goal_1");
-  visual_tools.publishText(text_pose, "Pose Goal (1)", rvt::WHITE, rvt::XLARGE);
-  visual_tools.trigger();
-
-  /* We can also use visual_tools to wait for user input */
-  visual_tools.prompt("Press 'next' in the RvizVisualToolsGui window to continue the demo");
 
   // Joint Space Goals
   // ^^^^^^^^^^^^^^^^^
@@ -252,23 +214,12 @@ int main(int argc, char** argv)
   res.getMessage(response);
   display_trajectory.trajectory.push_back(response.trajectory);
 
-  /* Now you should see two planned trajectories in series*/
-  visual_tools.publishTrajectoryLine(display_trajectory.trajectory.back(), joint_model_group);
-  visual_tools.trigger();
   display_publisher->publish(display_trajectory);
 
   /* We will add more goals. But first, set the state in the planning
      scene to the final state of the last plan */
   robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
   planning_scene->setCurrentState(*robot_state.get());
-
-  // Display the goal state
-  visual_tools.publishAxisLabeled(pose.pose, "goal_2");
-  visual_tools.publishText(text_pose, "Joint Space Goal (2)", rvt::WHITE, rvt::XLARGE);
-  visual_tools.trigger();
-
-  /* Wait for user input */
-  visual_tools.prompt("Press 'next' in the RvizVisualToolsGui window to continue the demo");
 
   /* Now, we go back to the first goal to prepare for orientation constrained planning */
   req.goal_constraints.clear();
@@ -278,19 +229,11 @@ int main(int argc, char** argv)
   res.getMessage(response);
 
   display_trajectory.trajectory.push_back(response.trajectory);
-  visual_tools.publishTrajectoryLine(display_trajectory.trajectory.back(), joint_model_group);
-  visual_tools.trigger();
   display_publisher->publish(display_trajectory);
 
   /* Set the state in the planning scene to the final state of the last plan */
   robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
   planning_scene->setCurrentState(*robot_state.get());
-
-  // Display the goal state
-  visual_tools.trigger();
-
-  /* Wait for user input */
-  visual_tools.prompt("Press 'next' in the RvizVisualToolsGui window to continue the demo");
 
   // Adding Path Constraints
   // ^^^^^^^^^^^^^^^^^^^^^^^
@@ -332,22 +275,14 @@ int main(int argc, char** argv)
   context->solve(res);
   res.getMessage(response);
   display_trajectory.trajectory.push_back(response.trajectory);
-  visual_tools.publishTrajectoryLine(display_trajectory.trajectory.back(), joint_model_group);
-  visual_tools.trigger();
   display_publisher->publish(display_trajectory);
 
   /* Set the state in the planning scene to the final state of the last plan */
   robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
   planning_scene->setCurrentState(*robot_state.get());
 
-  // Display the goal state
-  visual_tools.publishAxisLabeled(pose.pose, "goal_3");
-  visual_tools.publishText(text_pose, "Orientation Constrained Motion Plan (3)", rvt::WHITE, rvt::XLARGE);
-  visual_tools.trigger();
-
   // END_TUTORIAL
   /* Wait for user input */
-  visual_tools.prompt("Press 'next' in the RvizVisualToolsGui window to exit the demo");
   planner_instance.reset();
 
   rclcpp::shutdown();

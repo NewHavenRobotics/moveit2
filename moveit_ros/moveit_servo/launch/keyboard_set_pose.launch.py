@@ -3,6 +3,7 @@ import yaml
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
+from moveit_configs_utils import MoveItConfigsBuilder
 
 def load_file(package_name, file_path):
     package_path = get_package_share_directory(package_name)
@@ -27,10 +28,13 @@ def load_yaml(package_name, file_path):
     
 def generate_launch_description():
     # Load additional robot description and planning configurations
-    robot_description_config = load_file(
-        "arm_moveit_config", "config/arm.urdf.xacro"
+    moveit_config = (
+        MoveItConfigsBuilder("arm")
+        .robot_description(file_path="config/arm.urdf.xacro")
+        .trajectory_execution(file_path="config/moveit_controllers.yaml")
+        .to_moveit_configs()
     )
-    robot_description = {"robot_description": robot_description_config}
+
 
     robot_description_semantic_config = load_file(
         "arm_moveit_config", "config/arm.srdf"
@@ -54,7 +58,7 @@ def generate_launch_description():
                 executable="keyboard_autonomy_node",
                 name="keyboard_autonomy_node",
                 parameters=[
-                    robot_description,
+                    moveit_config.robot_description,
                     robot_description_semantic,
                     kinematics_yaml,
                     planning_yaml,
