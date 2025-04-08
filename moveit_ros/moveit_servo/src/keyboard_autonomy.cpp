@@ -44,6 +44,9 @@
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <moveit_msgs/msg/planning_scene.h>
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("Keyboard_Autonomy");
 
@@ -89,6 +92,16 @@ int main(int argc, char** argv)
   // Configure a valid robot state
   planning_scene->getCurrentStateNonConst().setToDefaultValues(joint_model_group, "ready");
 
+  // Set the robot state to the "folded" state defined in the SRDF
+  if (!robot_state->setToDefaultValues(joint_model_group, "folded"))
+  {
+    RCLCPP_FATAL(LOGGER, "Failed to set robot state to 'folded'");
+    return 1;
+  }
+
+  // Update the planning scene with the folded state
+  planning_scene->setCurrentState(*robot_state);
+
   // We will now construct a loader to load a planner, by name.
   // Note that we are using the ROS pluginlib library here.
   std::unique_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager>> planner_plugin_loader;
@@ -133,14 +146,44 @@ int main(int argc, char** argv)
   // ^^^^^^^^^
   // We will now create a motion plan request for the arm of the Panda
   // specifying the desired pose of the end-effector as input.
+
+  // Define object position in reference to gripper_camera_link
+  double pose_x = 0.5;  // Example value
+  double pose_y = -0.3;  // Example value
+  double pose_z = 0.0;  // Example value
+
+  // Create a TF2 buffer and listener
+  tf2_ros::Buffer tf_buffer(keyboard_autonomy_node->get_clock());
+  tf2_ros::TransformListener tf_listener(tf_buffer);
+
+  // Define the pose in gripper_camera_link frame
+  geometry_msgs::msg::PoseStamped object_pose_in_camera_frame;
+  object_pose_in_camera_frame.header.frame_id = "gripper_camera_link";
+  object_pose_in_camera_frame.header.stamp = keyboard_autonomy_node->now();
+  object_pose_in_camera_frame.pose.position.x = pose_x;
+  object_pose_in_camera_frame.pose.position.y = pose_y;
+  object_pose_in_camera_frame.pose.position.z = pose_z;
+  object_pose_in_camera_frame.pose.orientation.w = 1.0;
+
+  // Transform the pose to arm_base_link frame with a timeout
+  geometry_msgs::msg::PoseStamped object_pose_in_base_frame;
+  try
+  {
+    object_pose_in_base_frame = tf_buffer.transform(
+        object_pose_in_camera_frame, "arm_base_link", tf2::durationFromSec(1.0));
+  }
+  catch (tf2::TransformException& ex)
+  {
+    RCLCPP_ERROR(LOGGER, "Transform error: %s", ex.what());
+    return 1;
+  }
+
+  // Use the transformed pose for planning
   planning_interface::MotionPlanRequest req;
   planning_interface::MotionPlanResponse res;
   geometry_msgs::msg::PoseStamped pose;
   pose.header.frame_id = "arm_base_link";
-  pose.pose.position.x = 0.3;
-  pose.pose.position.y = 0.4;
-  pose.pose.position.z = 0.75;
-  pose.pose.orientation.w = 1.0;
+  pose.pose = object_pose_in_base_frame.pose;
 
   // A tolerance of 0.01 m is specified in position
   // and 0.01 radians in orientation
@@ -191,95 +234,95 @@ int main(int argc, char** argv)
   // Joint Space Goals
   // ^^^^^^^^^^^^^^^^^
   // Now, setup a joint space goal
-  moveit::core::RobotState goal_state(robot_model);
-  std::vector<double> joint_values = { -1.0, 0.7, 0.7, -1.5, -0.7, 2.0, 0.0 };
-  goal_state.setJointGroupPositions(joint_model_group, joint_values);
-  moveit_msgs::msg::Constraints joint_goal =
-      kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group);
-  req.goal_constraints.clear();
-  req.goal_constraints.push_back(joint_goal);
+  // moveit::core::RobotState goal_state(robot_model);
+  // std::vector<double> joint_values = { -1.0, 0.7, 0.7, -1.5, -0.7, 2.0, 0.0 };
+  // goal_state.setJointGroupPositions(joint_model_group, joint_values);
+  // moveit_msgs::msg::Constraints joint_goal =
+  //     kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group);
+  // req.goal_constraints.clear();
+  // req.goal_constraints.push_back(joint_goal);
 
-  // Call the planner and visualize the trajectory
-  /* Re-construct the planning context */
-  context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
-  /* Call the Planner */
-  context->solve(res);
-  /* Check that the planning was successful */
-  if (res.error_code_.val != res.error_code_.SUCCESS)
-  {
-    RCLCPP_ERROR(LOGGER, "Could not compute plan successfully");
-    return 0;
-  }
-  /* Visualize the trajectory */
-  res.getMessage(response);
-  display_trajectory.trajectory.push_back(response.trajectory);
+  // // Call the planner and visualize the trajectory
+  // /* Re-construct the planning context */
+  // context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
+  // /* Call the Planner */
+  // context->solve(res);
+  // /* Check that the planning was successful */
+  // if (res.error_code_.val != res.error_code_.SUCCESS)
+  // {
+  //   RCLCPP_ERROR(LOGGER, "Could not compute plan successfully");
+  //   return 0;
+  // }
+  // /* Visualize the trajectory */
+  // res.getMessage(response);
+  // display_trajectory.trajectory.push_back(response.trajectory);
 
-  display_publisher->publish(display_trajectory);
+  // display_publisher->publish(display_trajectory);
 
-  /* We will add more goals. But first, set the state in the planning
-     scene to the final state of the last plan */
-  robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
-  planning_scene->setCurrentState(*robot_state.get());
+  // /* We will add more goals. But first, set the state in the planning
+  //    scene to the final state of the last plan */
+  // robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
+  // planning_scene->setCurrentState(*robot_state.get());
 
-  /* Now, we go back to the first goal to prepare for orientation constrained planning */
-  req.goal_constraints.clear();
-  req.goal_constraints.push_back(pose_goal);
-  context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
-  context->solve(res);
-  res.getMessage(response);
+  // /* Now, we go back to the first goal to prepare for orientation constrained planning */
+  // req.goal_constraints.clear();
+  // req.goal_constraints.push_back(pose_goal);
+  // context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
+  // context->solve(res);
+  // res.getMessage(response);
 
-  display_trajectory.trajectory.push_back(response.trajectory);
-  display_publisher->publish(display_trajectory);
+  // display_trajectory.trajectory.push_back(response.trajectory);
+  // display_publisher->publish(display_trajectory);
 
-  /* Set the state in the planning scene to the final state of the last plan */
-  robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
-  planning_scene->setCurrentState(*robot_state.get());
+  // /* Set the state in the planning scene to the final state of the last plan */
+  // robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
+  // planning_scene->setCurrentState(*robot_state.get());
 
-  // Adding Path Constraints
-  // ^^^^^^^^^^^^^^^^^^^^^^^
-  // Let's add a new pose goal again. This time we will also add a path constraint to the motion.
-  /* Let's create a new pose goal */
+  // // Adding Path Constraints
+  // // ^^^^^^^^^^^^^^^^^^^^^^^
+  // // Let's add a new pose goal again. This time we will also add a path constraint to the motion.
+  // /* Let's create a new pose goal */
 
-  pose.pose.position.x = 0.32;
-  pose.pose.position.y = -0.25;
-  pose.pose.position.z = 0.65;
-  pose.pose.orientation.w = 1.0;
-  moveit_msgs::msg::Constraints pose_goal_2 =
-      kinematic_constraints::constructGoalConstraints("wrist3_link", pose, tolerance_pose, tolerance_angle);
+  // pose.pose.position.x = 0.32;
+  // pose.pose.position.y = -0.25;
+  // pose.pose.position.z = 0.65;
+  // pose.pose.orientation.w = 1.0;
+  // moveit_msgs::msg::Constraints pose_goal_2 =
+  //     kinematic_constraints::constructGoalConstraints("wrist3_link", pose, tolerance_pose, tolerance_angle);
 
-  /* Now, let's try to move to this new pose goal*/
-  req.goal_constraints.clear();
-  req.goal_constraints.push_back(pose_goal_2);
+  // /* Now, let's try to move to this new pose goal*/
+  // req.goal_constraints.clear();
+  // req.goal_constraints.push_back(pose_goal_2);
 
-  /* But, let's impose a path constraint on the motion.
-     Here, we are asking for the end-effector to stay level*/
-  geometry_msgs::msg::QuaternionStamped quaternion;
-  quaternion.header.frame_id = "arm_base_link";
-  req.path_constraints = kinematic_constraints::constructGoalConstraints("wrist3_link", quaternion);
+  // /* But, let's impose a path constraint on the motion.
+  //    Here, we are asking for the end-effector to stay level*/
+  // geometry_msgs::msg::QuaternionStamped quaternion;
+  // quaternion.header.frame_id = "arm_base_link";
+  // req.path_constraints = kinematic_constraints::constructGoalConstraints("wrist3_link", quaternion);
 
-  // Imposing path constraints requires the planner to reason in the space of possible positions of the end-effector
-  // (the workspace of the robot)
-  // because of this, we need to specify a bound for the allowed planning volume as well;
-  // Note: a default bound is automatically filled by the WorkspaceBounds request adapter (part of the OMPL pipeline,
-  // but that is not being used in this example).
-  // We use a bound that definitely includes the reachable space for the arm. This is fine because sampling is not done
-  // in this volume
-  // when planning for the arm; the bounds are only used to determine if the sampled configurations are valid.
-  req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y =
-      req.workspace_parameters.min_corner.z = -2.0;
-  req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y =
-      req.workspace_parameters.max_corner.z = 2.0;
+  // // Imposing path constraints requires the planner to reason in the space of possible positions of the end-effector
+  // // (the workspace of the robot)
+  // // because of this, we need to specify a bound for the allowed planning volume as well;
+  // // Note: a default bound is automatically filled by the WorkspaceBounds request adapter (part of the OMPL pipeline,
+  // // but that is not being used in this example).
+  // // We use a bound that definitely includes the reachable space for the arm. This is fine because sampling is not done
+  // // in this volume
+  // // when planning for the arm; the bounds are only used to determine if the sampled configurations are valid.
+  // req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y =
+  //     req.workspace_parameters.min_corner.z = -2.0;
+  // req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y =
+  //     req.workspace_parameters.max_corner.z = 2.0;
 
-  // Call the planner and visualize all the plans created so far.
-  context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
-  context->solve(res);
-  res.getMessage(response);
-  display_trajectory.trajectory.push_back(response.trajectory);
-  display_publisher->publish(display_trajectory);
+  // // Call the planner and visualize all the plans created so far.
+  // context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
+  // context->solve(res);
+  // res.getMessage(response);
+  // display_trajectory.trajectory.push_back(response.trajectory);
+  // display_publisher->publish(display_trajectory);
 
-  /* Set the state in the planning scene to the final state of the last plan */
-  robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
-  planning_scene->setCurrentState(*robot_state.get());
+  // /* Set the state in the planning scene to the final state of the last plan */
+  // robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
+  // planning_scene->setCurrentState(*robot_state.get());
 
   // END_TUTORIAL
   /* Wait for user input */
