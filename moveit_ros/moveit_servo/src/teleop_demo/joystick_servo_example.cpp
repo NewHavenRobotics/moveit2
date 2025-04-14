@@ -148,20 +148,11 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
     // The bread and butter: map buttons to twist commands
     twist->twist.linear.z = axes[0];
     twist->twist.linear.y = -axes[2];
-
-    // double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    // double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
     twist->twist.linear.x = axes[1];
     return true;
   }else if(joyNum == 2){
-    // twist->twist.angular.y = axes[LEFT_STICK_Y];
     twist->twist.angular.y = axes[0];
-    // twist->twist.angular.x = axes[LEFT_STICK_X];
     twist->twist.angular.x = axes[1];
-
-    // double roll_positive = buttons[RIGHT_BUMPER];
-    // double roll_negative = -1 * (buttons[LEFT_BUMPER]);
-    // twist->twist.angular.z = roll_positive + roll_negative;
     twist->twist.angular.z = axes[2];
     return true;
   }else if(joyNum == 3){
@@ -234,47 +225,6 @@ public:
     servo_start_client_ = this->create_client<std_srvs::srv::Trigger>("/servo_node/start_servo");
     servo_start_client_->wait_for_service(std::chrono::seconds(1));
     servo_start_client_->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
-
-    // // Load the collision scene asynchronously
-    // collision_pub_thread_ = std::thread([this]() {
-    //   rclcpp::sleep_for(std::chrono::seconds(3));
-    //   // Create collision object, in the way of servoing
-    //   moveit_msgs::msg::CollisionObject collision_object;
-    //   collision_object.header.frame_id = "Arm_Base_Link";
-    //   collision_object.id = "box";
-
-    //   shape_msgs::msg::SolidPrimitive table_1;
-    //   table_1.type = table_1.BOX;
-    //   table_1.dimensions = { 0.4, 0.6, 0.03 };
-
-    //   geometry_msgs::msg::Pose table_1_pose;
-    //   table_1_pose.position.x = 0.6;
-    //   table_1_pose.position.y = 0.0;
-    //   table_1_pose.position.z = 0.4;
-
-    //   shape_msgs::msg::SolidPrimitive table_2;
-    //   table_2.type = table_2.BOX;
-    //   table_2.dimensions = { 0.6, 0.4, 0.03 };
-
-    //   geometry_msgs::msg::Pose table_2_pose;
-    //   table_2_pose.position.x = 0.0;
-    //   table_2_pose.position.y = 0.5;
-    //   table_2_pose.position.z = 0.25;
-
-    //   collision_object.primitives.push_back(table_1);
-    //   collision_object.primitive_poses.push_back(table_1_pose);
-    //   collision_object.primitives.push_back(table_2);
-    //   collision_object.primitive_poses.push_back(table_2_pose);
-    //   collision_object.operation = collision_object.ADD;
-
-    //   moveit_msgs::msg::PlanningSceneWorld psw;
-    //   psw.collision_objects.push_back(collision_object);
-
-    //   auto ps = std::make_unique<moveit_msgs::msg::PlanningScene>();
-    //   ps->world = psw;
-    //   ps->is_diff = true;
-    //   collision_pub_->publish(std::move(ps));
-    // });
   }
 
   ~JoyToServoPub() override

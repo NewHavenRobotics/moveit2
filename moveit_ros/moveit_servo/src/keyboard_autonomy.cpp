@@ -90,7 +90,7 @@ int main(int argc, char** argv)
   planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model));
 
   // Configure a valid robot state
-  planning_scene->getCurrentStateNonConst().setToDefaultValues(joint_model_group, "ready");
+  planning_scene->getCurrentStateNonConst().setToDefaultValues(joint_model_group, "folded");
 
   // Set the robot state to the "folded" state defined in the SRDF
   if (!robot_state->setToDefaultValues(joint_model_group, "folded"))
@@ -159,7 +159,7 @@ int main(int argc, char** argv)
   // Define the pose in gripper_camera_link frame
   geometry_msgs::msg::PoseStamped object_pose_in_camera_frame;
   object_pose_in_camera_frame.header.frame_id = "gripper_camera_link";
-  object_pose_in_camera_frame.header.stamp = keyboard_autonomy_node->now();
+  object_pose_in_camera_frame.header.stamp = rclcpp::Time(0);
   object_pose_in_camera_frame.pose.position.x = pose_x;
   object_pose_in_camera_frame.pose.position.y = pose_y;
   object_pose_in_camera_frame.pose.position.z = pose_z;
@@ -215,21 +215,29 @@ int main(int argc, char** argv)
   // Visualize the result
   // ^^^^^^^^^^^^^^^^^^^^
   std::shared_ptr<rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>> display_publisher =
-      keyboard_autonomy_node->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path",
-                                                                                               1);
+      keyboard_autonomy_node->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path", 1);
   moveit_msgs::msg::DisplayTrajectory display_trajectory;
 
   /* Visualize the trajectory */
   moveit_msgs::msg::MotionPlanResponse response;
   res.getMessage(response);
 
-  display_trajectory.trajectory_start = response.trajectory_start;
+  // Publish the planned trajectory
   display_trajectory.trajectory.push_back(response.trajectory);
+  display_trajectory.model_id = robot_model->getName();
+  display_trajectory.trajectory_start = response.trajectory_start;
   display_publisher->publish(display_trajectory);
 
-  /* Set the state in the planning scene to the final state of the last plan */
+  // Set the robot state to the final state of the trajectory
   robot_state->setJointGroupPositions(joint_model_group, response.trajectory.joint_trajectory.points.back().positions);
   planning_scene->setCurrentState(*robot_state.get());
+
+  // Publish the final state as a static visualization
+  moveit_msgs::msg::PlanningScene planning_scene_msg;
+  planning_scene->getPlanningSceneMsg(planning_scene_msg);
+  std::shared_ptr<rclcpp::Publisher<moveit_msgs::msg::PlanningScene>> planning_scene_publisher =
+      keyboard_autonomy_node->create_publisher<moveit_msgs::msg::PlanningScene>("/planning_scene", 1);
+  planning_scene_publisher->publish(planning_scene_msg);
 
   // Joint Space Goals
   // ^^^^^^^^^^^^^^^^^
