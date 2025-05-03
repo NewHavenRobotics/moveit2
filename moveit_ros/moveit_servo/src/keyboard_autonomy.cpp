@@ -45,8 +45,83 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2/LinearMath/Quaternion.h>
+#include <std_msgs/msg/int32.hpp>
+#include <chrono>
+#include <thread>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("Keyboard_Autonomy");
+
+bool transformPose(const geometry_msgs::msg::PoseStamped& input_pose_stamped, 
+                   const std::string& target_frame, 
+                   tf2_ros::Buffer& tf_buffer, 
+                   geometry_msgs::msg::PoseStamped& output_pose_stamped)
+{
+  try
+  {
+    output_pose_stamped = tf_buffer.transform(input_pose_stamped, target_frame, tf2::durationFromSec(1.0));
+    return true;
+  }
+  catch (tf2::TransformException& ex)
+  {
+    RCLCPP_ERROR(LOGGER, "Transform failed: %s", ex.what());
+    return false;
+  }
+}
+
+bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped, 
+                    moveit::planning_interface::MoveGroupInterface& move_group)
+{
+  move_group.setPoseTarget(target_pose_stamped);
+
+  moveit::planning_interface::MoveGroupInterface::Plan plan;
+  bool success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  if (!success)
+  {
+    RCLCPP_ERROR(LOGGER, "Planning failed");
+    return false;
+  }
+
+  success = (move_group.execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  if (!success)
+  {
+    RCLCPP_ERROR(LOGGER, "Execution failed");
+    return false;
+  }
+
+  return true;
+}
+
+void populatePose(geometry_msgs::msg::PoseStamped& pose_stamped, 
+                  const std::string& frame_id, 
+                  double x, double y, double z)
+{
+  pose_stamped.header.frame_id = frame_id;
+  pose_stamped.header.stamp = rclcpp::Time(0);
+  pose_stamped.pose.position.x = x;
+  pose_stamped.pose.position.y = y;
+  pose_stamped.pose.position.z = z;
+
+  tf2::Quaternion quaternion;
+  quaternion.setRPY(0, -M_PI_2, 0); // -90 degrees in pitch
+  pose_stamped.pose.orientation.x = quaternion.x();
+  pose_stamped.pose.orientation.y = quaternion.y();
+  pose_stamped.pose.orientation.z = quaternion.z();
+  pose_stamped.pose.orientation.w = quaternion.w();
+}
+
+void publishButton(const rclcpp::Node::SharedPtr& node, const std::string& topic, int duration_seconds)
+{
+  auto publisher = node->create_publisher<std_msgs::msg::Int32>(topic, 10);
+
+  std_msgs::msg::Int32 msg;
+  msg.data = 1;
+  publisher->publish(msg); // Publish a single 1
+  std::this_thread::sleep_for(std::chrono::seconds(duration_seconds)); // Wait for the specified duration
+
+  msg.data = 0;
+  publisher->publish(msg); // Publish a single 0
+  RCLCPP_INFO(LOGGER, "Finished publishing to %s.", topic.c_str());
+}
 
 int main(int argc, char** argv)
 {
@@ -67,56 +142,64 @@ int main(int argc, char** argv)
   tf2_ros::Buffer tf_buffer(keyboard_autonomy_node->get_clock());
   tf2_ros::TransformListener tf_listener(tf_buffer);
 
-  // Define input pose in gripper_camera_link frame
-  geometry_msgs::msg::PoseStamped input_pose_stamped;
-  input_pose_stamped.header.frame_id = "gripper_camera_link";
-  input_pose_stamped.header.stamp = rclcpp::Time(0); // Use latest available transform
-  input_pose_stamped.pose.position.x = 0.1; // Example input position
-  input_pose_stamped.pose.position.y = -0.5;
-  input_pose_stamped.pose.position.z = 0.3;
+  RCLCPP_INFO(LOGGER, "Defining key poses...");
 
-  tf2::Quaternion input_quaternion;
-  input_quaternion.setRPY(0, -M_PI_2, 0); // Example input orientation
-  input_pose_stamped.pose.orientation.x = input_quaternion.x();
-  input_pose_stamped.pose.orientation.y = input_quaternion.y();
-  input_pose_stamped.pose.orientation.z = input_quaternion.z();
-  input_pose_stamped.pose.orientation.w = input_quaternion.w();
+  geometry_msgs::msg::PoseStamped key1_pose_stamped;
+  populatePose(key1_pose_stamped, "gripper_camera_link", -0.1934, 0.5668, -0.0622);
 
-  // Transform input pose to arm_base_link frame
-  geometry_msgs::msg::PoseStamped target_pose_stamped;
-  try
+  geometry_msgs::msg::PoseStamped key2_pose_stamped;
+  populatePose(key2_pose_stamped, "gripper_camera_link", 0.1934, 0.5668, -0.0622);
+
+  RCLCPP_INFO(LOGGER, "Transforming key poses to 'arm_base_link' frame...");
+
+  // Transform key poses to arm_base_link frame
+  geometry_msgs::msg::PoseStamped key1_transformed_pose;
+  geometry_msgs::msg::PoseStamped key2_transformed_pose;
+  if (!transformPose(key1_pose_stamped, "arm_base_link", tf_buffer, key1_transformed_pose) || 
+      !transformPose(key2_pose_stamped, "arm_base_link", tf_buffer, key2_transformed_pose))
   {
-    target_pose_stamped = tf_buffer.transform(input_pose_stamped, "arm_base_link", tf2::durationFromSec(1.0));
-  }
-  catch (tf2::TransformException& ex)
-  {
-    RCLCPP_ERROR(LOGGER, "Transform failed: %s", ex.what());
+    RCLCPP_ERROR(LOGGER, "Failed to transform poses.");
     rclcpp::shutdown();
     return 1;
   }
 
-  // Set the transformed pose as the target pose
-  move_group.setPoseTarget(target_pose_stamped);
+  RCLCPP_INFO(LOGGER, "Planning and executing motion to key1 pose...");
 
-  // Plan and execute
-  moveit::planning_interface::MoveGroupInterface::Plan plan;
-  bool success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-  if (!success)
+  // Plan and execute the first pose
+  if (!planAndExecute(key1_transformed_pose, move_group))
   {
-    RCLCPP_ERROR(LOGGER, "Planning failed");
+    RCLCPP_ERROR(LOGGER, "Failed to plan and execute motion to key1 pose.");
     rclcpp::shutdown();
     return 1;
   }
 
-  success = (move_group.execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-  if (!success)
+  // Publish to /transmitter/button0
+  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button0...");
+  publishButton(keyboard_autonomy_node, "/transmitter/button0", 3);
+
+  // Publish to /transmitter/button1
+  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button1...");
+  publishButton(keyboard_autonomy_node, "/transmitter/button1", 3);
+
+  RCLCPP_INFO(LOGGER, "Planning and executing motion to key2 pose...");
+
+  // Plan and execute the second pose
+  if (!planAndExecute(key2_transformed_pose, move_group))
   {
-    RCLCPP_ERROR(LOGGER, "Execution failed");
+    RCLCPP_ERROR(LOGGER, "Failed to plan and execute motion to key2 pose.");
     rclcpp::shutdown();
     return 1;
   }
 
-  // Safely shutdown
+  // Publish to /transmitter/button0
+  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button0...");
+  publishButton(keyboard_autonomy_node, "/transmitter/button0", 3);
+
+  // Publish to /transmitter/button1
+  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button1...");
+  publishButton(keyboard_autonomy_node, "/transmitter/button1", 3);
+
+  RCLCPP_INFO(LOGGER, "Motion execution completed successfully.");
   rclcpp::shutdown();
   return 0;
 }
