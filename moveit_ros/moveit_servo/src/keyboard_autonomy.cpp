@@ -136,6 +136,34 @@ std::vector<geometry_msgs::msg::PoseStamped> createTargetPoses(const std::string
   return poses;
 }
 
+std::vector<std::tuple<double, double, double>> parsePositionsFromArray(const std::vector<float>& position_array)
+{
+  std::vector<std::tuple<double, double, double>> positions;
+
+  if (position_array.empty())
+  {
+    RCLCPP_ERROR(LOGGER, "Position array is empty.");
+    return positions;
+  }
+
+  size_t num_positions = static_cast<size_t>(position_array[0]);
+  if (position_array.size() != 1 + num_positions * 3)
+  {
+    RCLCPP_ERROR(LOGGER, "Position array size does not match the expected format.");
+    return positions;
+  }
+
+  for (size_t i = 0; i < num_positions; ++i)
+  {
+    double x = position_array[1 + i * 3];
+    double y = position_array[2 + i * 3];
+    double z = position_array[3 + i * 3];
+    positions.emplace_back(x, y, z);
+  }
+
+  return positions;
+}
+
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
@@ -157,13 +185,18 @@ int main(int argc, char** argv)
 
   RCLCPP_INFO(LOGGER, "Defining target poses...");
 
-  // Define positions for target poses
-  std::vector<std::tuple<double, double, double>> positions = {
-    {-0.1934, 0.5668, -0.0622}, // Key1 position
-    {0.1934, 0.5668, -0.0622},   // Key2 position
-    {0.0581, 0.5668, -0.0319},
-    {-0.1094, 0.5668, 0.1024}
+  // Define the array of positions
+  std::vector<float> position_array = {
+    5, // Number of positions
+    -0.1484, 0.5668, -0.097,  // Position 1
+    -0.0184, 0.5668, 0.078,   // Position 2
+    -0.1084, 0.5668, -0.0097, // Position 3
+    -0.1484, 0.5668, -0.0097, // Position 4
+    -0.0434, 0.5668, -0.0322  // Position 5
   };
+
+  // Parse positions from the array
+  auto positions = parsePositionsFromArray(position_array);
 
   // Create target poses
   auto target_poses = createTargetPoses("gripper_camera_link", positions);
