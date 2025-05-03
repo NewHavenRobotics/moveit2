@@ -123,6 +123,19 @@ void publishButton(const rclcpp::Node::SharedPtr& node, const std::string& topic
   RCLCPP_INFO(LOGGER, "Finished publishing to %s.", topic.c_str());
 }
 
+std::vector<geometry_msgs::msg::PoseStamped> createTargetPoses(const std::string& frame_id, 
+                                                               const std::vector<std::tuple<double, double, double>>& positions)
+{
+  std::vector<geometry_msgs::msg::PoseStamped> poses;
+  for (const auto& [x, y, z] : positions)
+  {
+    geometry_msgs::msg::PoseStamped pose_stamped;
+    populatePose(pose_stamped, frame_id, x, y, z);
+    poses.push_back(pose_stamped);
+  }
+  return poses;
+}
+
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
@@ -142,62 +155,55 @@ int main(int argc, char** argv)
   tf2_ros::Buffer tf_buffer(keyboard_autonomy_node->get_clock());
   tf2_ros::TransformListener tf_listener(tf_buffer);
 
-  RCLCPP_INFO(LOGGER, "Defining key poses...");
+  RCLCPP_INFO(LOGGER, "Defining target poses...");
 
-  geometry_msgs::msg::PoseStamped key1_pose_stamped;
-  populatePose(key1_pose_stamped, "gripper_camera_link", -0.1934, 0.5668, -0.0622);
+  // Define positions for target poses
+  std::vector<std::tuple<double, double, double>> positions = {
+    {-0.1934, 0.5668, -0.0622}, // Key1 position
+    {0.1934, 0.5668, -0.0622},   // Key2 position
+    {0.0581, 0.5668, -0.0319},
+    {-0.1094, 0.5668, 0.1024}
+  };
 
-  geometry_msgs::msg::PoseStamped key2_pose_stamped;
-  populatePose(key2_pose_stamped, "gripper_camera_link", 0.1934, 0.5668, -0.0622);
+  // Create target poses
+  auto target_poses = createTargetPoses("gripper_camera_link", positions);
 
-  RCLCPP_INFO(LOGGER, "Transforming key poses to 'arm_base_link' frame...");
+  RCLCPP_INFO(LOGGER, "Transforming target poses to 'arm_base_link' frame...");
 
-  // Transform key poses to arm_base_link frame
-  geometry_msgs::msg::PoseStamped key1_transformed_pose;
-  geometry_msgs::msg::PoseStamped key2_transformed_pose;
-  if (!transformPose(key1_pose_stamped, "arm_base_link", tf_buffer, key1_transformed_pose) || 
-      !transformPose(key2_pose_stamped, "arm_base_link", tf_buffer, key2_transformed_pose))
+  // Transform target poses to arm_base_link frame
+  std::vector<geometry_msgs::msg::PoseStamped> transformed_poses;
+  for (const auto& pose : target_poses)
   {
-    RCLCPP_ERROR(LOGGER, "Failed to transform poses.");
-    rclcpp::shutdown();
-    return 1;
+    geometry_msgs::msg::PoseStamped transformed_pose;
+    if (!transformPose(pose, "arm_base_link", tf_buffer, transformed_pose))
+    {
+      RCLCPP_ERROR(LOGGER, "Failed to transform a pose.");
+      rclcpp::shutdown();
+      return 1;
+    }
+    transformed_poses.push_back(transformed_pose);
   }
 
-  RCLCPP_INFO(LOGGER, "Planning and executing motion to key1 pose...");
+  RCLCPP_INFO(LOGGER, "Planning and executing motions to target poses...");
 
-  // Plan and execute the first pose
-  if (!planAndExecute(key1_transformed_pose, move_group))
+  // Plan and execute motions to each target pose
+  for (size_t i = 0; i < transformed_poses.size(); ++i)
   {
-    RCLCPP_ERROR(LOGGER, "Failed to plan and execute motion to key1 pose.");
-    rclcpp::shutdown();
-    return 1;
+    RCLCPP_INFO(LOGGER, "Planning and executing motion to target pose %zu...", i + 1);
+    if (!planAndExecute(transformed_poses[i], move_group))
+    {
+      RCLCPP_ERROR(LOGGER, "Failed to plan and execute motion to target pose %zu.", i + 1);
+      rclcpp::shutdown();
+      return 1;
+    }
+
+    // Publish to /transmitter/button0 and /transmitter/button1 after each motion
+    RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button0...");
+    publishButton(keyboard_autonomy_node, "/transmitter/button0", 3);
+
+    RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button1...");
+    publishButton(keyboard_autonomy_node, "/transmitter/button1", 3);
   }
-
-  // Publish to /transmitter/button0
-  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button0...");
-  publishButton(keyboard_autonomy_node, "/transmitter/button0", 3);
-
-  // Publish to /transmitter/button1
-  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button1...");
-  publishButton(keyboard_autonomy_node, "/transmitter/button1", 3);
-
-  RCLCPP_INFO(LOGGER, "Planning and executing motion to key2 pose...");
-
-  // Plan and execute the second pose
-  if (!planAndExecute(key2_transformed_pose, move_group))
-  {
-    RCLCPP_ERROR(LOGGER, "Failed to plan and execute motion to key2 pose.");
-    rclcpp::shutdown();
-    return 1;
-  }
-
-  // Publish to /transmitter/button0
-  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button0...");
-  publishButton(keyboard_autonomy_node, "/transmitter/button0", 3);
-
-  // Publish to /transmitter/button1
-  RCLCPP_INFO(LOGGER, "Publishing to /transmitter/button1...");
-  publishButton(keyboard_autonomy_node, "/transmitter/button1", 3);
 
   RCLCPP_INFO(LOGGER, "Motion execution completed successfully.");
   rclcpp::shutdown();
