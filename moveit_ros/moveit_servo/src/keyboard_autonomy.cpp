@@ -46,10 +46,19 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <std_msgs/msg/int32.hpp>
+#include <std_msgs/msg/float32_multi_array.hpp>
 #include <chrono>
 #include <thread>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("Keyboard_Autonomy");
+
+std::vector<float> position_array;
+
+void keyboardPositionsCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+  RCLCPP_INFO(LOGGER, "Received new positions from /keyboard_positions.");
+  position_array = msg->data;
+}
 
 bool transformPose(const geometry_msgs::msg::PoseStamped& input_pose_stamped, 
                    const std::string& target_frame, 
@@ -183,17 +192,18 @@ int main(int argc, char** argv)
   tf2_ros::Buffer tf_buffer(keyboard_autonomy_node->get_clock());
   tf2_ros::TransformListener tf_listener(tf_buffer);
 
-  RCLCPP_INFO(LOGGER, "Defining target poses...");
+  // Subscribe to /keyboard_positions
+  auto subscription = keyboard_autonomy_node->create_subscription<std_msgs::msg::Float32MultiArray>(
+      "/keyboard_positions", 10, keyboardPositionsCallback);
 
-  // Define the array of positions
-  std::vector<float> position_array = {
-    5, // Number of positions
-    -0.1484, 0.5668, -0.097,  // Position 1
-    -0.0184, 0.5668, 0.078,   // Position 2
-    -0.1084, 0.5668, -0.0097, // Position 3
-    -0.1484, 0.5668, -0.0097, // Position 4
-    -0.0434, 0.5668, -0.0322  // Position 5
-  };
+  RCLCPP_INFO(LOGGER, "Waiting for positions on /keyboard_positions...");
+  while (rclcpp::ok() && position_array.empty())
+  {
+    rclcpp::spin_some(keyboard_autonomy_node);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+
+  RCLCPP_INFO(LOGGER, "Defining target poses...");
 
   // Parse positions from the array
   auto positions = parsePositionsFromArray(position_array);
