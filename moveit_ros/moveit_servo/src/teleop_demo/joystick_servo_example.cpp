@@ -59,7 +59,7 @@
 // We'll just set up parameters here
 const std::string JOY0_TOPIC = "/joy";
 const std::string JOY1_TOPIC = "/transmitter/joy10";
-const std::string JOY2_TOPIC = "/transmitter/joy20";
+const std::string JOY2_TOPIC = "/transmitter/joy2";
 const std::string JOY3_TOPIC = "/transmitter/joy3";
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
@@ -109,12 +109,12 @@ std::map<Button, double> BUTTON_DEFAULTS;
  * @return return true if you want to publish a Twist, false if you want to publish a JointJog
  */
 bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vector<int>& buttons,
-                     std::unique_ptr<geometry_msgs::msg::TwistStamped>& twist,
-                     std::unique_ptr<control_msgs::msg::JointJog>& joint)
+  std::unique_ptr<geometry_msgs::msg::TwistStamped>& twist,
+  std::unique_ptr<control_msgs::msg::JointJog>& joint)
 {
   // Give joint jogging priority because it is only buttons
   // If any joint jog command is requested, we are only publishing joint commands
-  if(joyNum == 0){ // PS controller
+  if(joyNum == 0){
     if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y]){
       // Map the D_PAD to the proximal joints
       joint->joint_names.push_back("joint_A");
@@ -129,23 +129,32 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       joint->velocities.push_back(buttons[B] - buttons[Y]);
       return false;
     }
-      // The bread and butter: map buttons to twist commands
-      twist->twist.linear.z = axes[RIGHT_STICK_Y];
-      twist->twist.linear.y = axes[RIGHT_STICK_X];
+    // The bread and butter: map buttons to twist commands
+    twist->twist.linear.z = axes[RIGHT_STICK_Y];
+    twist->twist.linear.y = axes[RIGHT_STICK_X];
 
-      double lin_x_right = -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-      double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-      twist->twist.linear.x = lin_x_right + lin_x_left;
+    double lin_x_right = -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
+    double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+    twist->twist.linear.x = lin_x_right + lin_x_left;
 
-      twist->twist.angular.y = axes[LEFT_STICK_Y];
-      twist->twist.angular.x = axes[LEFT_STICK_X];
+    twist->twist.angular.y = axes[LEFT_STICK_Y];
+    twist->twist.angular.x = axes[LEFT_STICK_X];
 
-      double roll_positive = buttons[RIGHT_BUMPER];
-      double roll_negative = -1 * (buttons[LEFT_BUMPER]);
-      twist->twist.angular.z = roll_positive + roll_negative;
+    double roll_positive = buttons[RIGHT_BUMPER];
+    double roll_negative = -1 * (buttons[LEFT_BUMPER]);
+    twist->twist.angular.z = roll_positive + roll_negative;
 
-      return true;
-  }else if(joyNum == 2){ // transmitter joystick
+    return true;
+  }else if(joyNum == 1){
+    // The bread and butter: map buttons to twist commands
+    twist->twist.linear.z = axes[0];
+    twist->twist.linear.y = -axes[2];
+
+    // double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
+    // double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+    twist->twist.linear.x = axes[1];
+    return true;
+  }else if(joyNum == 2){
     if(!buttons[0]){
       joint->joint_names.push_back("joint_A");
       joint->velocities.push_back(std::round(-axes[2] * 100) / 100.0);
@@ -166,8 +175,18 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       joint->velocities.push_back(std::round(axes[2] * 100) / 100.0);
     }
     return false;
+  }else if(joyNum == 3){ // transmitter joystick
+        // twist->twist.angular.y = axes[LEFT_STICK_Y];
+        twist->twist.angular.y = axes[0];
+        // twist->twist.angular.x = axes[LEFT_STICK_X];
+        twist->twist.angular.x = axes[1];
+    
+        // double roll_positive = buttons[RIGHT_BUMPER];
+        // double roll_negative = -1 * (buttons[LEFT_BUMPER]);
+        // twist->twist.angular.z = roll_positive + roll_negative;
+        twist->twist.angular.z = axes[2];
+        return true;
   }
-
   return true;
 }
 
