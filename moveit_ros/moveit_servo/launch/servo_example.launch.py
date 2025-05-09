@@ -1,7 +1,7 @@
 import os
 import yaml
 from launch import LaunchDescription
-from launch.actions import TimerAction, DeclareLaunchArgument
+from launch.actions import TimerAction, DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
@@ -102,6 +102,18 @@ def generate_launch_description():
             "--inactive",
         ],
     )
+    
+    chassis_transform_spawner = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='arm_to_rover_tf',
+        arguments=[
+            '-0.13', '-0.095', '0.17625',  # translation (x y z)
+            '1.5708', '0', '-1.5708',                           # rotation (roll pitch yaw)
+            'chassis_link',                                    # parent frame
+            'arm_base_link' 
+        ]
+    )
 
     # Launch as much as possible in components
     container = ComposableNodeContainer(
@@ -164,7 +176,21 @@ def generate_launch_description():
         ],
     )
     
-    nodes=[
+    joy_to_twist_node = Node(
+        package="rover_arm_scripts",  # Replace with the correct package name if different
+        executable="joy_to_twist",
+        name="joy_to_twist",
+        output="screen",
+    )
+    
+    joy_repeater_node = Node(
+        package="rover_arm_scripts",
+        executable="joy_repeater",
+        name="joy_repeater",
+        output="screen",
+    )
+
+    nodes = [
         # delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
         # rviz_node,
@@ -173,7 +199,9 @@ def generate_launch_description():
         arm_controller_spawner,
         ros2_control_node,
         # velocity_controller_spawner,
+        joy_to_twist_node,  
+        joy_repeater_node,
+        chassis_transform_spawner,
     ]
-
 
     return LaunchDescription(nodes)

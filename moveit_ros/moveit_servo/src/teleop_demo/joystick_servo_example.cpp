@@ -54,15 +54,16 @@
 #include <rclcpp/utilities.hpp>
 #include <thread>
 #include <iostream> // Add this include for debug output
+#include <cmath>
 
 // We'll just set up parameters here
 const std::string JOY0_TOPIC = "/joy";
-const std::string JOY1_TOPIC = "/transmitter/joy1";
-const std::string JOY2_TOPIC = "/transmitter/joy2";
+const std::string JOY1_TOPIC = "/transmitter/joy10";
+const std::string JOY2_TOPIC = "/transmitter/joy20";
 const std::string JOY3_TOPIC = "/transmitter/joy3";
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
-const std::string EEF_FRAME_ID = "gripper_link";
+const std::string EEF_FRAME_ID = "tip_link";
 const std::string BASE_FRAME_ID = "arm_base_link";
 
 // Enums for button names -> axis/button array index
@@ -113,7 +114,7 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
 {
   // Give joint jogging priority because it is only buttons
   // If any joint jog command is requested, we are only publishing joint commands
-  if(joyNum == 0){
+  if(joyNum == 0){ // PS controller
     if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y]){
       // Map the D_PAD to the proximal joints
       joint->joint_names.push_back("joint_A");
@@ -144,49 +145,28 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       twist->twist.angular.z = roll_positive + roll_negative;
 
       return true;
-  }else if(joyNum == 1){
-    // The bread and butter: map buttons to twist commands
-    twist->twist.linear.z = axes[0];
-    twist->twist.linear.y = -axes[2];
-
-    // double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    // double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-    twist->twist.linear.x = axes[1];
-    return true;
-  }else if(joyNum == 2){
-    // twist->twist.angular.y = axes[LEFT_STICK_Y];
-    twist->twist.angular.y = axes[0];
-    // twist->twist.angular.x = axes[LEFT_STICK_X];
-    twist->twist.angular.x = axes[1];
-
-    // double roll_positive = buttons[RIGHT_BUMPER];
-    // double roll_negative = -1 * (buttons[LEFT_BUMPER]);
-    // twist->twist.angular.z = roll_positive + roll_negative;
-    twist->twist.angular.z = axes[2];
-    return true;
-  }else if(joyNum == 3){
+  }else if(joyNum == 2){ // transmitter joystick
     if(!buttons[0]){
       joint->joint_names.push_back("joint_A");
-      joint->velocities.push_back(-axes[2]);
+      joint->velocities.push_back(std::round(-axes[2] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_B");
-      joint->velocities.push_back(-axes[1]);
+      joint->velocities.push_back(std::round(-axes[1] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_C"); // what is nussy even sayin?!?!?!?
-      joint->velocities.push_back(-axes[0]);
+      joint->velocities.push_back(std::round(-axes[0] * 100) / 100.0);
     }else{
       joint->joint_names.push_back("joint_D");
-      joint->velocities.push_back(axes[1]);
+      joint->velocities.push_back(std::round(axes[1] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_E");
-      joint->velocities.push_back(-axes[0]);
+      joint->velocities.push_back(std::round(-axes[0] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_F"); // what is nussy even sayin?!?!?!?
-      joint->velocities.push_back(axes[2]);
+      joint->velocities.push_back(std::round(axes[2] * 100) / 100.0);
     }
     return false;
   }
-
 
   return true;
 }
@@ -235,46 +215,6 @@ public:
     servo_start_client_->wait_for_service(std::chrono::seconds(1));
     servo_start_client_->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
 
-    // // Load the collision scene asynchronously
-    // collision_pub_thread_ = std::thread([this]() {
-    //   rclcpp::sleep_for(std::chrono::seconds(3));
-    //   // Create collision object, in the way of servoing
-    //   moveit_msgs::msg::CollisionObject collision_object;
-    //   collision_object.header.frame_id = "Arm_Base_Link";
-    //   collision_object.id = "box";
-
-    //   shape_msgs::msg::SolidPrimitive table_1;
-    //   table_1.type = table_1.BOX;
-    //   table_1.dimensions = { 0.4, 0.6, 0.03 };
-
-    //   geometry_msgs::msg::Pose table_1_pose;
-    //   table_1_pose.position.x = 0.6;
-    //   table_1_pose.position.y = 0.0;
-    //   table_1_pose.position.z = 0.4;
-
-    //   shape_msgs::msg::SolidPrimitive table_2;
-    //   table_2.type = table_2.BOX;
-    //   table_2.dimensions = { 0.6, 0.4, 0.03 };
-
-    //   geometry_msgs::msg::Pose table_2_pose;
-    //   table_2_pose.position.x = 0.0;
-    //   table_2_pose.position.y = 0.5;
-    //   table_2_pose.position.z = 0.25;
-
-    //   collision_object.primitives.push_back(table_1);
-    //   collision_object.primitive_poses.push_back(table_1_pose);
-    //   collision_object.primitives.push_back(table_2);
-    //   collision_object.primitive_poses.push_back(table_2_pose);
-    //   collision_object.operation = collision_object.ADD;
-
-    //   moveit_msgs::msg::PlanningSceneWorld psw;
-    //   psw.collision_objects.push_back(collision_object);
-
-    //   auto ps = std::make_unique<moveit_msgs::msg::PlanningScene>();
-    //   ps->world = psw;
-    //   ps->is_diff = true;
-    //   collision_pub_->publish(std::move(ps));
-    // });
   }
 
   ~JoyToServoPub() override

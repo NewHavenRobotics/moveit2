@@ -7,25 +7,27 @@ use_gazebo: false # Whether the robot is started in a Gazebo simulation environm
 command_in_type: "unitless" # "unitless"> in the range [-1:1], as if from joystick. "speed_units"> cmds are in m/s and rad/s
 scale:
   # Scale parameters are only used if command_in_type=="unitless"
-  linear:  0.2  # Max linear velocity. Unit is [m/s]. Only used for Cartesian commands.
-  rotational:  0.4 # Max angular velocity. Unit is [rad/s]. Only used for Cartesian commands.
+  linear:  0.4  # Max linear velocity. Unit is [m/s]. Only used for Cartesian commands.
+  rotational:  0.8 # Max angular velocity. Unit is [rad/s]. Only used for Cartesian commands.
   # Max joint angular/linear velocity. Only used for joint commands on joint_command_in_topic.
-  joint: 0.9
+  joint: 1.5
 
 # Optionally override Servo's internal velocity scaling when near singularity or collision (0.0 = use internal velocity scaling)
 # override_velocity_scaling_factor = 0.0 # valid range [0.0:1.0]
 
 ## Properties of outgoing commands
-publish_period: 0.075  # 1/Nominal publish rate [seconds]
+publish_period: 0.04  # 1/Nominal publish rate [seconds] 0.075 = 13.33Hz
+# publish_period: 0.01  # 1/Nominal publish rate [seconds] 0.1 = 10Hz
 low_latency_mode: false  # Set this to true to publish as soon as an incoming Twist command is received (publish_period is ignored)
 
 # What type of topic does your robot driver expect?
 # Currently supported are std_msgs/Float64MultiArray or trajectory_msgs/JointTrajectory
-command_out_type: trajectory_msgs/JointTrajectory
+# command_out_type: trajectory_msgs/JointTrajectory
+command_out_type: std_msgs/Float64MultiArray
 
 # What to publish? Can save some bandwidth as most robots only require positions or velocities
 publish_joint_positions: true
-publish_joint_velocities: true
+publish_joint_velocities: false
 publish_joint_accelerations: false
 
 ## Plugins for smoothing outgoing commands
@@ -42,7 +44,7 @@ move_group_name: arm  # Often 'manipulator' or 'arm'
 planning_frame: arm_base_link  # The MoveIt planning frame. Often 'base_link' or 'world'
 
 ## Other frames
-ee_frame_name: wrist3_link  # The name of the end effector link, used to return the EE pose
+ee_frame_name: tip_link  # The name of the end effector link, used to return the EE pose
 robot_link_command_frame:  arm_base_link  # commands must be given in the frame of a robot link. Usually either the base or end effector
 
 ## Stopping behaviour
@@ -52,17 +54,19 @@ incoming_command_timeout:  0.1  # Stop servoing if X seconds elapse without a ne
 num_outgoing_halt_msgs_to_publish: 4
 
 ## Configure handling of singularities and joint limits
-lower_singularity_threshold:  100.0  # Start decelerating when the condition number hits this (close to singularity)
-hard_stop_singularity_threshold: 200.0 # Stop when the condition number hits this
+lower_singularity_threshold:  17.0  # Start decelerating when the condition number hits this (close to singularity)
+hard_stop_singularity_threshold: 30.0 # Stop when the condition number hits this
 joint_limit_margin: 0.1 # added as a buffer to joint limits [radians]. If moving quickly, make this larger.
 leaving_singularity_threshold_multiplier: 2.0 # Multiply the hard stop limit by this when leaving singularity (see https://github.com/ros-planning/moveit2/pull/620)
 
 ## Topic names
 cartesian_command_in_topic: ~/delta_twist_cmds  # Topic for incoming Cartesian twist commands
+# cartesian_command_in_topic: ~/test_twist_cmds
 joint_command_in_topic: ~/delta_joint_cmds # Topic for incoming joint angle commands
 joint_topic: /joint_states
 status_topic: ~/status # Publish status to this topic
-command_out_topic: /arm_controller/joint_trajectory # Publish outgoing commands here
+# command_out_topic: /arm_controller/joint_trajectory # Publish outgoing commands here
+command_out_topic: /arm_controller/commands # Publish outgoing commands here
 # command_out_topic: /botwheel_explorere/joint_trajectory # Publish outgoing commands here
 
 ## Collision checking for the entire robot body
