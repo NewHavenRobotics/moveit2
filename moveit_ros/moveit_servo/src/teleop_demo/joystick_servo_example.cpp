@@ -146,13 +146,16 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
 
     return true;
   }else if(joyNum == 1){
-    // The bread and butter: map buttons to twist commands
-    twist->twist.linear.z = axes[0];
-    twist->twist.linear.y = -axes[2];
-
-    // double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    // double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-    twist->twist.linear.x = axes[1];
+    if(!buttons[0]){
+      // The bread and butter: map buttons to twist commands
+      twist->twist.linear.z = axes[0];
+      twist->twist.linear.y = -axes[2];
+      twist->twist.linear.x = axes[1];
+    }else{
+      twist->twist.angular.y = axes[0];
+      twist->twist.angular.x = axes[1];
+      twist->twist.angular.z = axes[2];
+    }
     return true;
   }else if(joyNum == 2){
     if(!buttons[0]){
