@@ -10,6 +10,8 @@ from launch_ros.descriptions import ComposableNode
 from launch.actions import ExecuteProcess
 import xacro
 from moveit_configs_utils import MoveItConfigsBuilder
+from launch.conditions import IfCondition
+from launch.substitutions import TextSubstitution
 
 
 def load_file(package_name, file_path):
@@ -35,12 +37,25 @@ def load_yaml(package_name, file_path):
 
 
 def generate_launch_description():
-        
-    moveit_config = (
-        MoveItConfigsBuilder("arm")
-        .robot_description(file_path="config/arm.urdf.xacro")
-        .to_moveit_configs()
+    xacro_griper_select = LaunchConfiguration("long_dist_gripper")
+
+    declare_xacro_gripper_select = DeclareLaunchArgument(
+        "long_dist_gripper",
+        default_value="true",
+        description="Select the gripper type to use",
     )
+
+    # Manually process the xacro file
+    xacro_file = os.path.join(
+        get_package_share_directory("arm_moveit_config"), "config", "arm.urdf.xacro"
+    )
+    robot_description_config = xacro.process_file(
+        xacro_file, mappings={"long_dist_gripper": "true"}
+    )
+    robot_description = {"robot_description": robot_description_config.toxml()}
+
+    moveit_config = MoveItConfigsBuilder("arm").to_moveit_configs()
+    moveit_config.robot_description = robot_description
 
     # Get parameters for the Servo node
     servo_yaml = load_yaml("moveit_servo", "config/arm_simulated_config.yaml")
@@ -191,6 +206,7 @@ def generate_launch_description():
     )
 
     nodes = [
+        declare_xacro_gripper_select,
         delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
         # rviz_node,
