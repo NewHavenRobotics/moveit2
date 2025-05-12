@@ -106,12 +106,12 @@ def generate_launch_description():
     chassis_transform_spawner = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='arm_to_rover_tf',
+        name='chassis_to_arm_tf',
         arguments=[
-            '-0.13', '-0.095', '0.17625',  # translation (x y z)
-            '1.5708', '0', '-1.5708',                           # rotation (roll pitch yaw)
-            'chassis_link',                                    # parent frame
-            'arm_base_link' 
+            '-0.14', '-0.153', '0.17',   # translation: x y z
+            '0', '0', '0',         # rotation: roll pitch yaw
+            'chassis_link',              # parent frame
+            'arm_base_link'              # child frame
         ]
     )
 
@@ -172,7 +172,7 @@ def generate_launch_description():
     delayed_moveit_nodes = TimerAction(
         period=5.0,  # Delay in seconds
         actions=[
-
+            chassis_transform_spawner,
         ],
     )
     
@@ -191,7 +191,7 @@ def generate_launch_description():
     )
 
     nodes = [
-        # delayed_moveit_nodes,
+        delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
         # rviz_node,
         servo_node,
@@ -201,7 +201,7 @@ def generate_launch_description():
         # velocity_controller_spawner,
         joy_to_twist_node,  
         joy_repeater_node,
-        chassis_transform_spawner,
+        # chassis_transform_spawner,
     ]
 
     return LaunchDescription(nodes)

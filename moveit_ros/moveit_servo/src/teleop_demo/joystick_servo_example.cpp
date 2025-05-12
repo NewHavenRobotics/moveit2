@@ -59,8 +59,8 @@
 // We'll just set up parameters here
 const std::string JOY0_TOPIC = "/joy";
 const std::string JOY1_TOPIC = "/transmitter/joy10";
-const std::string JOY2_TOPIC = "/transmitter/joy2";
-const std::string JOY3_TOPIC = "/transmitter/joy3";
+const std::string JOY2_TOPIC = "/transmitter/joy2_const";
+const std::string JOY3_TOPIC = "/transmitter/joy30";
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
 const std::string EEF_FRAME_ID = "tip_link";
@@ -163,10 +163,10 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       joint->velocities.push_back(std::round(-axes[2] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_B");
-      joint->velocities.push_back(std::round(-axes[1] * 100) / 100.0);
+      joint->velocities.push_back(std::round(axes[1] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_C"); // what is nussy even sayin?!?!?!?
-      joint->velocities.push_back(std::round(-axes[0] * 100) / 100.0);
+      joint->velocities.push_back(std::round(axes[0] * 100) / 100.0);
     }else{
       joint->joint_names.push_back("joint_D");
       joint->velocities.push_back(std::round(axes[1] * 100) / 100.0);
@@ -175,10 +175,10 @@ bool convertJoyToCmd(int joyNum, const std::vector<float>& axes, const std::vect
       joint->velocities.push_back(std::round(-axes[0] * 100) / 100.0);
 
       joint->joint_names.push_back("joint_F"); // what is nussy even sayin?!?!?!?
-      joint->velocities.push_back(std::round(axes[2] * 100) / 100.0);
+      joint->velocities.push_back(std::round(-axes[2] * 100) / 100.0);
     }
     return false;
-  }else if(joyNum == 3){ // transmitter joystick
+  }else if(joyNum == 4){ // transmitter joystick
         // twist->twist.angular.y = axes[LEFT_STICK_Y];
         twist->twist.angular.y = axes[0];
         // twist->twist.angular.x = axes[LEFT_STICK_X];
