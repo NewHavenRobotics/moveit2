@@ -77,10 +77,67 @@ bool transformPose(const geometry_msgs::msg::PoseStamped& input_pose_stamped,
   }
 }
 
+void publishConstraintMarker(const rclcpp::Node::SharedPtr& node,
+  const geometry_msgs::msg::Pose& pose,
+  const std::array<double, 3>& dimensions,
+  const std::string& frame_id)
+{
+auto marker_publisher = node->create_publisher<visualization_msgs::msg::Marker>("constraint_marker", 10);
+
+visualization_msgs::msg::Marker marker;
+marker.header.frame_id = frame_id;
+marker.header.stamp = node->get_clock()->now();
+marker.ns = "constraints";
+marker.id = 0;
+marker.type = visualization_msgs::msg::Marker::CUBE;
+marker.action = visualization_msgs::msg::Marker::ADD;
+
+// Set the position and orientation
+marker.pose = pose;
+
+// Set the dimensions of the box
+marker.scale.x = dimensions[0];
+marker.scale.y = dimensions[1];
+marker.scale.z = dimensions[2];
+
+// Set the color and transparency
+marker.color.r = 0.0f;
+marker.color.g = 1.0f;
+marker.color.b = 0.0f;
+marker.color.a = 0.5f; // Semi-transparent
+
+marker.lifetime = rclcpp::Duration::from_seconds(0); // Marker persists
+
+// Publish the marker
+marker_publisher->publish(marker);
+}
+
 bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped, 
-                    moveit::planning_interface::MoveGroupInterface& move_group)
+                    moveit::planning_interface::MoveGroupInterface& move_group,
+                    const rclcpp::Node::SharedPtr& keyboard_autonomy_node)
 {
   move_group.setPoseTarget(target_pose_stamped);
+
+  // Add position constraint
+  moveit_msgs::msg::PositionConstraint position_constraint;
+  position_constraint.link_name = "end_effector_link";
+  position_constraint.header.frame_id = "arm_base_link";
+  position_constraint.constraint_region.primitives.resize(1);
+  position_constraint.constraint_region.primitives[0].type = shape_msgs::msg::SolidPrimitive::BOX;
+  position_constraint.constraint_region.primitives[0].dimensions = {0.5, 0.5, 0.5}; // Allowed region dimensions
+  position_constraint.constraint_region.primitive_poses.resize(1);
+  position_constraint.constraint_region.primitive_poses[0].position = target_pose_stamped.pose.position;
+  position_constraint.weight = 1.0;
+
+  // Publish the position constraint as a marker
+  publishConstraintMarker(keyboard_autonomy_node,
+    position_constraint.constraint_region.primitive_poses[0],
+    {0.5, 0.5, 0.5}, // Dimensions of the constraint region
+    "arm_base_link");
+
+  moveit_msgs::msg::Constraints path_constraints;
+  path_constraints.position_constraints.push_back(position_constraint);
+  move_group.setPathConstraints(path_constraints);
 
   moveit::planning_interface::MoveGroupInterface::Plan plan;
   bool success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
@@ -97,6 +154,8 @@ bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped,
     return false;
   }
 
+  move_group.clearPathConstraints();
+
   return true;
 }
 
@@ -106,12 +165,12 @@ void populatePose(geometry_msgs::msg::PoseStamped& pose_stamped,
 {
   pose_stamped.header.frame_id = frame_id;
   pose_stamped.header.stamp = rclcpp::Time(0);
-  pose_stamped.pose.position.x = x;
+  pose_stamped.pose.position.x = -x;
   pose_stamped.pose.position.y = y;
   pose_stamped.pose.position.z = z;
 
   tf2::Quaternion quaternion;
-  quaternion.setRPY(0, -M_PI_2, 0); // -90 degrees in pitch
+  quaternion.setRPY(M_PI_2, 0, -M_PI_2); 
   pose_stamped.pose.orientation.x = quaternion.x();
   pose_stamped.pose.orientation.y = quaternion.y();
   pose_stamped.pose.orientation.z = quaternion.z();
@@ -233,7 +292,7 @@ int main(int argc, char** argv)
   for (size_t i = 0; i < transformed_poses.size(); ++i)
   {
     RCLCPP_INFO(LOGGER, "Planning and executing motion to target pose %zu...", i + 1);
-    if (!planAndExecute(transformed_poses[i], move_group))
+    if (!planAndExecute(transformed_poses[i], move_group, keyboard_autonomy_node))
     {
       RCLCPP_ERROR(LOGGER, "Failed to plan and execute motion to target pose %zu.", i + 1);
       rclcpp::shutdown();

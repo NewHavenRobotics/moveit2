@@ -48,7 +48,7 @@ def generate_launch_description():
 
     # RViz
     rviz_config_file = (
-        get_package_share_directory("moveit_servo") + "/config/demo_rviz_config.rviz"
+        get_package_share_directory("arm_moveit_config") + "/config/moveit.rviz"
     )
     rviz_node = Node(
         package="rviz2",
@@ -101,6 +101,14 @@ def generate_launch_description():
             "/controller_manager",
             "--inactive",
         ],
+    )
+
+    # Start the actual move_group node/action server (added from move_group)
+    run_move_group_node = Node(
+        package="moveit_ros_move_group",
+        executable="move_group",
+        output="screen",
+        parameters=[moveit_config.to_dict()],
     )
 
     # Launch as much as possible in components
@@ -172,6 +180,7 @@ def generate_launch_description():
         container,
         arm_controller_spawner,
         ros2_control_node,
+        run_move_group_node,    # Added
         # velocity_controller_spawner,
     ]
 
