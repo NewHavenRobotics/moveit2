@@ -23,6 +23,7 @@ set(SERVO_CONTROLLER_INPUT servo_controller_input)
 set(SERVO_NODE_MAIN_NAME servo_node_main)
 set(POSE_TRACKING_DEMO_NAME servo_pose_tracking_demo)
 set(FAKE_SERVO_CMDS_NAME fake_command_publisher)
+set(KEYBOARD_AUTONOMY_NODE_NAME keyboard_autonomy_node)
 
 #################################################################
 
@@ -50,6 +51,10 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
 find_package(ament_cmake REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(graph_msgs REQUIRED)
+find_package(moveit_ros_planning_interface REQUIRED)
+find_package(moveit_visual_tools REQUIRED)
+find_package(rviz_visual_tools REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
@@ -124,6 +129,31 @@ ament_target_dependencies(${FAKE_SERVO_CMDS_NAME}
   std_srvs
 )
 
+# Add executable for keyboard autonomy
+add_executable(${KEYBOARD_AUTONOMY_NODE_NAME} src/keyboard_autonomy.cpp)
+ament_target_dependencies(${KEYBOARD_AUTONOMY_NODE_NAME}
+  control_msgs
+  control_toolbox
+  geometry_msgs
+  moveit_core
+  moveit_msgs
+  moveit_ros_planning
+  moveit_ros_planning_interface
+  pluginlib
+  rclcpp
+  rclcpp_components
+  sensor_msgs
+  std_msgs
+  std_srvs
+  tf2_eigen
+  trajectory_msgs
+  graph_msgs
+)
+target_link_libraries(${KEYBOARD_AUTONOMY_NODE_NAME}
+  moveit_visual_tools::moveit_visual_tools
+  rviz_visual_tools::rviz_visual_tools
+)
+
 #############
 ## Install ##
 #############
@@ -150,6 +180,7 @@ install(
     ${CPP_DEMO_NAME}
     ${POSE_TRACKING_DEMO_NAME}
     ${FAKE_SERVO_CMDS_NAME}
+    ${KEYBOARD_AUTONOMY_NODE_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

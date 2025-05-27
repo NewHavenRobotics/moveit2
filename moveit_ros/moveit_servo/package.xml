@@ -36,7 +36,10 @@
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
   <depend>tf2_eigen</depend>
+  <depend>tf2_geometry_msgs</depend>
   <depend>trajectory_msgs</depend>
+
+  <build_depend>geometric_shapes</build_depend>
 
   <exec_depend>gripper_controllers</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
@@ -46,6 +49,7 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>moveit_configs_utils</exec_depend>
   <exec_depend>launch_param_builder</exec_depend>
+  <exec_depend>graph_msgs</exec_depend>
   <exec_depend>rclpy</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>

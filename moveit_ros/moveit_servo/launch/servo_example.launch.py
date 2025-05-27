@@ -63,7 +63,7 @@ def generate_launch_description():
 
     # RViz
     rviz_config_file = (
-        get_package_share_directory("moveit_servo") + "/config/demo_rviz_config.rviz"
+        get_package_share_directory("arm_moveit_config") + "/config/moveit.rviz"
     )
     rviz_node = Node(
         package="rviz2",
@@ -128,6 +128,14 @@ def generate_launch_description():
             'chassis_link',              # parent frame
             'arm_base_link'              # child frame
         ]
+    )
+
+    # Start the actual move_group node/action server (added from move_group)
+    run_move_group_node = Node(
+        package="moveit_ros_move_group",
+        executable="move_group",
+        output="screen",
+        parameters=[moveit_config.to_dict()],
     )
 
     # Launch as much as possible in components
@@ -209,11 +217,12 @@ def generate_launch_description():
         declare_xacro_gripper_select,
         delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
-        # rviz_node,
+        rviz_node,
         servo_node,
         container,
         arm_controller_spawner,
         ros2_control_node,
+        run_move_group_node,    # Added
         # velocity_controller_spawner,
         joy_to_twist_node,  
         joy_repeater_node,
