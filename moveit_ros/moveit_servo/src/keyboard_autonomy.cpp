@@ -120,7 +120,7 @@ bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped,
 
   // Add position constraint
   moveit_msgs::msg::PositionConstraint position_constraint;
-  position_constraint.link_name = "tip_link";
+  position_constraint.link_name = "end_effector_link";
   position_constraint.header.frame_id = "arm_base_link";
   position_constraint.constraint_region.primitives.resize(1);
   position_constraint.constraint_region.primitives[0].type = shape_msgs::msg::SolidPrimitive::BOX;
@@ -140,43 +140,61 @@ bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped,
   move_group.setPathConstraints(path_constraints);
 
   moveit::planning_interface::MoveGroupInterface::Plan plan;
-  bool success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-  if (!success)
+  bool success = false;
+
+  while (rclcpp::ok())
   {
-    RCLCPP_ERROR(LOGGER, "Planning failed");
-    return false;
-  }
-
-  RCLCPP_INFO(LOGGER, "Plan successful. Waiting for execution confirmation...");
-
-  // Wait for confirmation from the /execute_confirmation topic
-  auto confirmation_subscriber = keyboard_autonomy_node->create_subscription<std_msgs::msg::Int32>(
-      "/execute_confirmation", 10, [](const std_msgs::msg::Int32::SharedPtr msg) {
-        if (msg->data == 1)
-        {
-          RCLCPP_INFO(LOGGER, "Execution confirmed.");
-        }
-      });
-
-  // Spin until confirmation is received
-  bool confirmed = false;
-  auto confirmation_callback = [&confirmed](const std_msgs::msg::Int32::SharedPtr msg) {
-    if (msg->data == 1)
+    success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+    if (!success)
     {
-      confirmed = true;
+      RCLCPP_ERROR(LOGGER, "Planning failed");
+      return false;
     }
-  };
 
-  auto confirmation_subscription = keyboard_autonomy_node->create_subscription<std_msgs::msg::Int32>(
-      "/execute_confirmation", 10, confirmation_callback);
+    // Wait for confirmation or replan request on /pose_confirmation topic
+    RCLCPP_INFO(LOGGER, "Waiting for confirmation or replan request on /pose_confirmation...");
+    bool confirmed = false;
+    bool replan_requested = false;
 
-  while (rclcpp::ok() && !confirmed)
-  {
-    rclcpp::spin_some(keyboard_autonomy_node);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Use a shared pointer to update the confirmation or replan status in the callback
+    auto confirmation_callback = [&confirmed, &replan_requested](std_msgs::msg::Int32::SharedPtr msg) {
+      if (msg->data == 1)
+      {
+        RCLCPP_INFO(LOGGER, "Pose confirmation received.");
+        confirmed = true;
+      }
+      else if (msg->data == -1)
+      {
+        RCLCPP_INFO(LOGGER, "Replan request received.");
+        replan_requested = true;
+      }
+    };
+
+    auto confirmation_sub = keyboard_autonomy_node->create_subscription<std_msgs::msg::Int32>(
+        "/pose_confirmation", 10, confirmation_callback);
+
+    rclcpp::Rate rate(10); // 10 Hz
+    while (rclcpp::ok() && !confirmed && !replan_requested)
+    {
+      rclcpp::spin_some(keyboard_autonomy_node);
+      rate.sleep();
+    }
+
+    if (replan_requested)
+    {
+      RCLCPP_INFO(LOGGER, "Replanning...");
+      continue; // Replan the path
+    }
+
+    if (!confirmed)
+    {
+      RCLCPP_ERROR(LOGGER, "Pose confirmation not received. Aborting execution.");
+      return false;
+    }
+
+    break; // Exit the loop if confirmed
   }
 
-  // Execute the plan
   success = (move_group.execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
   if (!success)
   {

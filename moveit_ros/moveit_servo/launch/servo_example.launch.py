@@ -50,7 +50,7 @@ def generate_launch_description():
         get_package_share_directory("arm_moveit_config"), "config", "arm.urdf.xacro"
     )
     robot_description_config = xacro.process_file(
-        xacro_file, mappings={"long_dist_gripper": "true"}
+        xacro_file, mappings={"long_dist_gripper": "false"}
     )
     robot_description = {"robot_description": robot_description_config.toxml()}
 
