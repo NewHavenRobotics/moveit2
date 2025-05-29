@@ -215,7 +215,7 @@ def generate_launch_description():
 
     nodes = [
         declare_xacro_gripper_select,
-        delayed_moveit_nodes,
+        # delayed_moveit_nodes,
         joint_state_broadcaster_spawner,
         rviz_node,
         servo_node,
@@ -226,7 +226,7 @@ def generate_launch_description():
         # velocity_controller_spawner,
         joy_to_twist_node,  
         joy_repeater_node,
-        # chassis_transform_spawner,
+        chassis_transform_spawner,
     ]
 
     return LaunchDescription(nodes)
