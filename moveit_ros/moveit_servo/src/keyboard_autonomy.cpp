@@ -120,7 +120,7 @@ bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped,
 
   // Add position constraint
   moveit_msgs::msg::PositionConstraint position_constraint;
-  position_constraint.link_name = "end_effector_link";
+  position_constraint.link_name = "tip_link";
   position_constraint.header.frame_id = "arm_base_link";
   position_constraint.constraint_region.primitives.resize(1);
   position_constraint.constraint_region.primitives[0].type = shape_msgs::msg::SolidPrimitive::BOX;
@@ -147,6 +147,36 @@ bool planAndExecute(const geometry_msgs::msg::PoseStamped& target_pose_stamped,
     return false;
   }
 
+  RCLCPP_INFO(LOGGER, "Plan successful. Waiting for execution confirmation...");
+
+  // Wait for confirmation from the /execute_confirmation topic
+  auto confirmation_subscriber = keyboard_autonomy_node->create_subscription<std_msgs::msg::Int32>(
+      "/execute_confirmation", 10, [](const std_msgs::msg::Int32::SharedPtr msg) {
+        if (msg->data == 1)
+        {
+          RCLCPP_INFO(LOGGER, "Execution confirmed.");
+        }
+      });
+
+  // Spin until confirmation is received
+  bool confirmed = false;
+  auto confirmation_callback = [&confirmed](const std_msgs::msg::Int32::SharedPtr msg) {
+    if (msg->data == 1)
+    {
+      confirmed = true;
+    }
+  };
+
+  auto confirmation_subscription = keyboard_autonomy_node->create_subscription<std_msgs::msg::Int32>(
+      "/execute_confirmation", 10, confirmation_callback);
+
+  while (rclcpp::ok() && !confirmed)
+  {
+    rclcpp::spin_some(keyboard_autonomy_node);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+
+  // Execute the plan
   success = (move_group.execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
   if (!success)
   {
